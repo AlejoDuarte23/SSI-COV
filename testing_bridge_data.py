@@ -65,10 +65,10 @@ def plot_Data(t, rz, wn):
 fs = 15 
 
 acc = rz.T
-Nmin =10
-Nmax = 100
+Nmin = 7
+Nmax = 15
 Nc = acc.shape[1]
-Ts  = 20
+Ts  = 40
 fnS,zetaS, phiS,fn1_list,i_list,stablity_status,fn2  =  SSI.SSI_COV_AD(acc ,fs,Ts,Nc,Nmax,Nmin,10,0.01 )
 
 

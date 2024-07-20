@@ -45,7 +45,8 @@ def SSI_COV_AD(Acc,fs,Ts,Nc,Nmax,Nmin,Ncl,Lk_dist):
     print('Doing Stability Check')   
     Star = timer()
     fn2,zeta2,phi2,MAC,stablity_status = {},{},{},{},{}
-    
+
+
     for i in range(Nmax,Nmin-1,-1):
         if kk == 0:
             fn0,zeta0,phi0 = SSI.modalID(U,S,i,Nc,fs)
@@ -78,6 +79,7 @@ def SSI_COV_AD(Acc,fs,Ts,Nc,Nmax,Nmin,Ncl,Lk_dist):
     print('Elapse time [s] :',End-Star)
     
     # --------------------------- 9. flip dictionary -----------------------------#
+
     fn2 = SSI.flip_dic(fn2)
     zeta2 = SSI.flip_dic(zeta2)
     phi2 = SSI.flip_dic(phi2)

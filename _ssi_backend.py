@@ -1,16 +1,14 @@
-    
-#                               SSI COV 
-#                               Functions
-#                           by Alejandro Duarte 2020
 import numpy as np
 import matplotlib.pyplot as plt 
+
 from scipy.cluster.hierarchy import linkage,fcluster
 from collections import OrderedDict
 from tabulate import tabulate
 from scipy import signal
 from sklearn.cluster import KMeans
 from tabulate import tabulate
-
+from numpy.typing import NDArray
+from typing import Tuple
 
 # --------------------------- 1. Load Data -----------------------------------#
 def load_data(fn,delim):
@@ -32,7 +30,7 @@ def plot_ACC(Acc,io,ie):
         plt.title('Acceleration Record')
         plt.show()
 # --------------------------- 3. NexT ----------------------------------------#
-def NexT(acc,fs,Ts,Nc):
+def NexT(acc: NDArray, fs:float, Ts:float, Nc:int) -> NDArray:
     dt = 1/fs
     M = round(Ts/dt)
     IRF = np.zeros((Nc,Nc,M-1),dtype = complex) 
@@ -40,25 +38,36 @@ def NexT(acc,fs,Ts,Nc):
         for jj in range(Nc):
             y1 = np.fft.fft(acc[:,oo])
             y2 = np.fft.fft(acc[:,jj])
+            #cross-correlation: ifft[cross-power spectrum]
             h0 = np.fft.ifft(y1*y2.conj())
+            #impulse response function
             IRF[oo,jj,:] = np.real(h0[0:M-1])
+
     if Nc ==1:
         IRF = np.squeeze(IRF)
         IRF = IRF/IRF[0] 
+
     return IRF 
 # --------------------------- 4. blockToeplitz -------------------------------#
-def blockToeplitz(h):   
-    N1 = round(h.shape[2]/2)-1
-    M = h.shape[1]
-    T1= np.zeros(((N1)*M,(N1)*M),dtype = 'complex_')
+def blockToeplitz(IRF: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray]:   
+    N1 = round(IRF.shape[2]/2)-1
+    M = IRF.shape[1]
+    T1= np.zeros(((N1)*M,(N1)*M),dtype = 'complex128')
     for oo in range(N1):
         for ll in range(N1):
-            T1[(oo)*M:(oo+1)*M,(ll)*M:(ll+1)*M] = h[:,:,N1-1+oo-ll+1] 
-    [U,S,V] = np.linalg.svd(T1)
+            T1[(oo)*M:(oo+1)*M,(ll)*M:(ll+1)*M] = IRF[:,:,N1-1+oo-ll+1] 
+    [U,S,Vt] = np.linalg.svd(T1)
+    # this requires checking !!
+    V = Vt.T
+
     return U,S,V,T1
 # --------------------------- 5. Modal id ------------------------------------#
 def modalID(U,S,Nmodes,Nyy,fs):
     S = np.diag(S)
+    if Nmodes >= S.shape[0]:
+        print("changing the number of modes to the maximum possible")
+        Nmodes = S.shape[0]
+
     dt = 1/fs
     O = np.matmul(U[:,0:Nmodes],np.sqrt(S[0:Nmodes,0:Nmodes]))
     IndO = min(Nyy,len(O[:,0]))
@@ -75,16 +84,23 @@ def modalID(U,S,Nmodes,Nyy,fs):
     zetaoo = -np.real(mu)/np.abs(mu)
     zeta =  zetaoo[np.ix_(*[range(0,i,2) for i in zetaoo.shape])]
     phi0 = np.real(np.matmul(C[0:IndO,:],Di))
-    phi = phi0[:,1:-1:1]
+    #phi = phi0[:,1:-1:1]
+    phi = phi0[:,1::2]
+    print("shape phi",phi.shape)
     return fn,zeta,phi
 
 
 ##################################################
 
 def stabilityCheck2(fn0, zeta0, phi0, fn1, zeta1, phi1):
-    eps_freq = 1e-2 
+
+    for mode in range(min(phi0.shape[1],phi1.shape[1])):
+        print(f"Mode {mode + 1}")
+        for shape0, shape1 in zip(phi0[:, mode], phi1[:, mode]):
+            print(f"phi0: {shape0}, phi1: {shape1}")
+    eps_freq = 2e-2 
     eps_zeta = 4e-2 
-    eps_MAC = 5e-3
+    eps_MAC = 5e-2
     stability_status = []
     fn = []
     zeta = []
@@ -95,8 +111,8 @@ def stabilityCheck2(fn0, zeta0, phi0, fn1, zeta1, phi1):
     N0 = len(fn0)
     N1 = len(fn1)
 
-    for rr in range(N0):
-        for jj in range(N1):
+    for rr in range(N0-1):
+        for jj in range(N1-1):
             stab_fn = errorcheck(fn0[rr], fn1[jj], eps_freq)
             stab_zeta = errorcheck(zeta0[rr], zeta1[jj], eps_zeta)
             stab_phi, dummyMAC = getMAC(phi0[:, rr], phi1[:, jj], eps_MAC)
@@ -165,20 +181,6 @@ def getMAC2(phi1, phi2, eps_MAC):
 
     return stab_phi, dummyMAC
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-###########################################
 # --------------------------- 6. Stability Check  ----------------------------#
 def  stabilityCheck(fn0,zeta0,phi0,fn1,zeta1,phi1):
     eps_freq = 1e-2 
@@ -237,16 +239,27 @@ def errorcheck(xo,x1,eps):
         y = 0
     return y
 # --------------------------- 8. Get Mac -------------------------------------#
-def getMAC(x0,x1,eps):
-    Num = np.abs(np.matmul(x0[:],(x1[:].reshape(-1,1))))**2
-    D1 = np.matmul(x0[:],(x0[:].reshape(-1,1)))
-    D2 = np.matmul(x1[:],(x1[:].reshape(-1,1)))
-    dummpyMac = Num/(D1*D2)
-    if dummpyMac >(1-eps):
+# def getMAC(x0,x1,eps):
+#     Num = np.abs(np.matmul(x0[:],(x1[:].reshape(-1,1))))**2
+#     D1 = np.matmul(x0[:],(x0[:].reshape(-1,1)))
+#     D2 = np.matmul(x1[:],(x1[:].reshape(-1,1)))
+#     dummpyMac = Num/(D1*D2)
+#     if dummpyMac >(1-eps):
+#         y = 1
+#     else:
+#         y = 0 
+#     return  y,dummpyMac
+
+def getMAC(x0, x1, eps):
+    Num = np.abs(np.dot(x0.flatten(), x1.flatten()))**2
+    D1 = np.dot(x0.flatten(), x0.flatten())
+    D2 = np.dot(x1.flatten(), x1.flatten())
+    dummyMAC = Num / (D1 * D2)
+    if dummyMAC > (1 - eps):
         y = 1
     else:
-        y = 0 
-    return  y,dummpyMac
+        y = 0
+    return y, dummyMAC
 # --------------------------- 9. flip dictionary -----------------------------#
 def flip_dic(a):
     d = OrderedDict(a)
@@ -255,44 +268,74 @@ def flip_dic(a):
         dreversed[k] = d[k]        
     return dreversed
 # --------------------------- 9.Get stable Poles -----------------------------#
-def getStablePoles(fn,zeta,phi,MAC,stablity_status):
-    fnS = np.array([])
-    zetaS = np.array([])
+# def getStablePoles(fn,zeta,phi,MAC,stablity_status):
+#     fnS = np.array([])
+#     zetaS = np.array([])
+#     phiS = []
+#     MACS= np.array([])
+#     for i in range(len(fn)):
+#         for j in range(len(stablity_status[i])):
+#             if stablity_status[i][j]==3 or stablity_status[i][j] == 1:
+
+#                 fnS = np.append(fnS,fn[i][j])
+#                 zetaS = np.append(zetaS,zeta[i][j])
+#                 dummyyS= phi[i][:,j]
+#                 phiS.append(dummyyS)
+#                 MACS= np.append(MACS,MAC[i][j])           
+#     phiS = np.asarray(phiS ) 
+#     phiS = phiS.T
+#     #  remove negative damping
+#     fnS = np.delete(fnS,np.where(zetaS<0))
+#     phiS= np.delete(phiS,np.where(zetaS<0),1)
+#     MACS =  np.delete(MACS,np.where(zetaS<0))
+#     zetaS = np.delete(zetaS,np.where(zetaS<0))
+    
+#     # for oo in range(phiS.shape[1]):
+#     #     phiS[:,oo] = phiS[:,oo]/np.linalg.norm(phiS[:,oo])
+#     #     if np.diff(phiS[0:1,oo]) < 0:
+#     #         phiS[:,0] = -phiS[:,oo]
+#     for oo in range(phiS.shape[1]):
+#         phiS[:, oo] = phiS[:, oo] / np.max(np.abs(phiS[:, oo]))
+#         if np.diff(phiS[0:2, oo]) < 0:
+#             phiS[:, oo] = -phiS[:, oo]
+            
+#     return fnS,zetaS,phiS,MACS 
+
+def getStablePoles(fn, zeta, phi, MAC, stablity_status):
+    fnS = []
+    zetaS = []
     phiS = []
-    MACS= np.array([])
+    MACS = []
+    
     for i in range(len(fn)):
         for j in range(len(stablity_status[i])):
-            if stablity_status[i][j]==3 or stablity_status[i][j] == 1:
-
-                fnS = np.append(fnS,fn[i][j])
-                zetaS = np.append(zetaS,zeta[i][j])
-                dummyyS= phi[i][:,j]
-                phiS.append(dummyyS)
-                MACS= np.append(MACS,MAC[i][j])           
-    phiS = np.asarray(phiS ) 
-    phiS = phiS.T
-    #  remove negative damping
-    fnS = np.delete(fnS,np.where(zetaS<0))
-    phiS= np.delete(phiS,np.where(zetaS<0),1)
-    MACS =  np.delete(MACS,np.where(zetaS<0))
-    zetaS = np.delete(zetaS,np.where(zetaS<0))
+            if stablity_status[i][j] == 1:
+                fnS.append(fn[i][j])
+                zetaS.append(zeta[i][j])
+                phiS.append(phi[i][:, j])
+                MACS.append(MAC[i][j])
     
-    # for oo in range(phiS.shape[1]):
-    #     phiS[:,oo] = phiS[:,oo]/np.linalg.norm(phiS[:,oo])
-    #     if np.diff(phiS[0:1,oo]) < 0:
-    #         phiS[:,0] = -phiS[:,oo]
+    fnS = np.array(fnS)
+    zetaS = np.array(zetaS)
+    phiS = np.array(phiS).T
+    MACS = np.array(MACS)
+    
+    # Remove negative damping
+    valid_indices = zetaS > 0
+    fnS = fnS[valid_indices]
+    phiS = phiS[:, valid_indices]
+    MACS = MACS[valid_indices]
+    zetaS = zetaS[valid_indices]
+    
+    # Normalize mode shape
     for oo in range(phiS.shape[1]):
         phiS[:, oo] = phiS[:, oo] / np.max(np.abs(phiS[:, oo]))
         if np.diff(phiS[0:2, oo]) < 0:
             phiS[:, oo] = -phiS[:, oo]
-            
-    return fnS,zetaS,phiS,MACS 
+    
+    return fnS, zetaS, phiS, MACS
 # --------------------------------- 11.Cluster  ------------------------------#
-from sklearn.cluster import KMeans
 
-
-import numpy as np
-from scipy.cluster.hierarchy import linkage, fcluster
 
 def ClusterFun4(fn0, zeta0, phi0, Ncl, Lk_dist):
     def distance_fn_zeta(fn_zeta_i, fn_zeta_j):
@@ -625,8 +668,8 @@ def CPSD(Acc,fs,Nc,fo,fi):
     # Nc:  Number of channels
     AN = nextpow2(Acc)
     # Memory alocation for the matrix
-    PSD = np.zeros((Nc,Nc,int(AN/2)+1),dtype=np.complex_)
-    freq= np.zeros((Nc,Nc,int(AN/2)+1),dtype=np.complex_)
+    PSD = np.zeros((Nc,Nc,int(AN/2)+1),dtype='complex128')
+    freq= np.zeros((Nc,Nc,int(AN/2)+1),dtype='complex128')
 
     for i in range(Nc):
         for j in range(Nc):
@@ -713,8 +756,8 @@ def plotStabDiag(fn, Acc, fs, stability_status, Nmin, Nmax, Nc, fo, fi):
             return int(Nfft)
 
         AN = nextpow2(Acc)
-        PSD = np.zeros((Nc, Nc, int(AN / 2) + 1), dtype=np.complex_)
-        freq = np.zeros((Nc, Nc, int(AN / 2) + 1), dtype=np.complex_)
+        PSD = np.zeros((Nc, Nc, int(AN / 2) + 1), dtype='complex128')
+        freq = np.zeros((Nc, Nc, int(AN / 2) + 1), dtype='complex128')
 
         for i in range(Nc):
             for j in range(Nc):
