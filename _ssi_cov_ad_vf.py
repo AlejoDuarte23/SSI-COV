@@ -6,6 +6,9 @@ from tqdm import tqdm
 from timeit import default_timer as timer
 import pickle
 
+
+
+
 def SSI_COV_AD(Acc,fs,Ts,Nc,Nmax,Nmin,Ncl,Lk_dist):
 # --------------------------- 1. NexT ----------------------------------------#
     print('Doing Natural excitation')

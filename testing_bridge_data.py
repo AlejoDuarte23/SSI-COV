@@ -74,13 +74,15 @@ Nmin = 7
 Nmax = 50
 Nc = acc.shape[1]
 Ts  = 20
-fnS,zetaS, phiS,fn1_list,i_list,stablity_status,fn2  =  SSI.SSI_COV_AD(acc ,fs,Ts,Nc,Nmax,Nmin,10,0.01 )
+#fnS,zetaS, phiS,fn1_list,i_list,stablity_status,fn2  =  SSI.SSI_COV_AD(acc ,fs,Ts,Nc,Nmax,Nmin,10,0.01 )
 
+ssi_constructor = SSICOV(acc, fs, Ts, Nc, Nmax, Nmin)
 
-
+fnS,zetaS,phiS,MACS,stability_status,fn2 = ssi_constructor.run()
 
 num_clusters = 6
 summary = SSIb.cluster_data_by_frequency(fnS, zetaS, phiS, num_clusters)
 
+SSIb.plotStabDiag(fn2, acc, fs, stability_status, Nmin, Nmax, acc.shape[1], 0, 7.5)
 # Run the analysis
                  

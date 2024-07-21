@@ -2,7 +2,9 @@
 import numpy as np
 from collections import OrderedDict
 from numpy.typing import NDArray
-from typing import Tuple
+from typing import Tuple,Dict
+
+from utils import print_input_sizes
 
 class SSICOV:
     def __init__(self, acc: NDArray,
@@ -38,6 +40,7 @@ class SSICOV:
             IRF = IRF/IRF[0] 
         return IRF 
     
+    @print_input_sizes
     def blockToeplitz(self,IRF: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray]:   
         N1 = round(IRF.shape[2]/2)-1
         M = IRF.shape[1]
@@ -50,7 +53,7 @@ class SSICOV:
 
         return U,S,V,T1
     
-
+    @print_input_sizes
     def modalID(self,U,S,Nmodes,Nyy,fs):
         S = np.diag(S)
         if Nmodes >= S.shape[0]:
@@ -75,7 +78,7 @@ class SSICOV:
         phi = phi0[:,1::2]
         return fn,zeta,phi
     
-
+    @print_input_sizes
     def stabilityCheck(self, fn0, zeta0, phi0, fn1, zeta1, phi1):
 
         eps_freq = 2e-2 
@@ -124,8 +127,9 @@ class SSICOV:
         MAC = np.array(MAC)[ind]
         stability_status = np.array(stability_status)[ind]
 
-        return fn, zeta, phi, MAC, stability_status   
-    
+        return fn, zeta, phi, MAC, stability_status
+
+
 
     def errorcheck(self, xo,x1,eps):
         if abs(1-xo/x1)<eps:
@@ -146,13 +150,14 @@ class SSICOV:
             y = 0
         return y, dummyMAC
     
-    def flip_dic(self,a):
+    @print_input_sizes
+    def flip_dic(self, a) -> OrderedDict:
         d = OrderedDict(a)
         dreversed = OrderedDict()
         for k in reversed(d):
             dreversed[k] = d[k]        
         return dreversed
-    
+        
     def getStablePoles(self, fn, zeta, phi, MAC, stablity_status):
         fnS = []
         zetaS = []
@@ -220,14 +225,40 @@ class SSICOV:
     def run(self):
         IRF = self.NexT()
         [U,S,V,T] = self.blockToeplitz(IRF)
-        fn2, zeta2, phi2, MAC, stability_status = self.run_stability(U, S)
-        
-        print(zeta2)
+        # fn2, zeta2, phi2, MAC, stability_status = self.run_stability(U, S)
+        fn1_list = []
+        i_list = []
+        kk=0
+        fn2,zeta2,phi2,MAC,stability_status = {},{},{},{},{}
+
+        for i in range(self.Nmax,self.Nmin-1,-1):
+            if kk == 0:
+                fn0,zeta0,phi0 = self.modalID(U,S,i,self.Nc,self.fs)
+            else:
+                fn1,zeta1,phi1 = self.modalID(U,S,i,self.Nc,self.fs)
+                fn1_list.append(fn1)
+                i_list.append(i)
+
+
+                [a,b,c,d,e] = self.stabilityCheck(fn0,zeta0,phi0,fn1,zeta1,phi1)
+
+                fn2[kk-1]=a
+                zeta2[kk-1]=b
+                phi2[kk-1]=c
+                MAC[kk-1]=d
+                stability_status[kk-1]=e
+
+                fn0=fn1
+                zeta0=zeta1
+                phi0=phi1  
+            kk = kk +1 
+        print(fn2)
 
         fn2 , zeta2, phi2 = self.flip_dic(fn2), self.flip_dic(zeta2), self.flip_dic(phi2)   
+        print(phi2)
         fnS,zetaS,phiS,MACS = self.getStablePoles(fn2,zeta2,phi2,MAC,stability_status)
 
-        return fnS,zetaS,phiS,MACS,stability_status
+        return fnS,zetaS,phiS,MACS,stability_status, fn2
 
 
 
