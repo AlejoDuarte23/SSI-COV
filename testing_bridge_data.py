@@ -1,12 +1,17 @@
-import numpy as np
-import matplotlib.pyplot as plt
 from scipy.io import loadmat
 from scipy.signal import welch
-import _ssi_cov_ad_vf as SSI
-import _ssi_backend as SSIb
 from scipy import signal
 # import tabulate
 # Load .mat file
+import numpy as np
+import _ssi_cov_ad_vf as SSI
+import _ssi_backend as SSIb
+import matplotlib
+matplotlib.use('QT5Agg')
+import matplotlib.pyplot as plt
+
+from SSICOV import SSICOV
+
 mat = loadmat('BridgeData.mat')
 t, rz, wn = mat['t'], mat['rz'], mat['wn']
 
@@ -68,7 +73,7 @@ acc = rz.T
 Nmin = 7
 Nmax = 50
 Nc = acc.shape[1]
-Ts  = 40
+Ts  = 20
 fnS,zetaS, phiS,fn1_list,i_list,stablity_status,fn2  =  SSI.SSI_COV_AD(acc ,fs,Ts,Nc,Nmax,Nmin,10,0.01 )
 
 
@@ -76,6 +81,6 @@ fnS,zetaS, phiS,fn1_list,i_list,stablity_status,fn2  =  SSI.SSI_COV_AD(acc ,fs,T
 
 num_clusters = 6
 summary = SSIb.cluster_data_by_frequency(fnS, zetaS, phiS, num_clusters)
-             
+
+# Run the analysis
                  
-SSIb.plotStabDiag(fn2, acc, fs, stablity_status, Nmin, Nmax, acc.shape[1], 0, 7.5)

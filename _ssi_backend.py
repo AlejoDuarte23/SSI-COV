@@ -86,7 +86,7 @@ def modalID(U,S,Nmodes,Nyy,fs):
     phi0 = np.real(np.matmul(C[0:IndO,:],Di))
     #phi = phi0[:,1:-1:1]
     phi = phi0[:,1::2]
-    print("shape phi",phi.shape)
+    #print("shape phi",phi.shape)
     return fn,zeta,phi
 
 
@@ -94,10 +94,6 @@ def modalID(U,S,Nmodes,Nyy,fs):
 
 def stabilityCheck2(fn0, zeta0, phi0, fn1, zeta1, phi1):
 
-    for mode in range(min(phi0.shape[1],phi1.shape[1])):
-        print(f"Mode {mode + 1}")
-        for shape0, shape1 in zip(phi0[:, mode], phi1[:, mode]):
-            print(f"phi0: {shape0}, phi1: {shape1}")
     eps_freq = 2e-2 
     eps_zeta = 4e-2 
     eps_MAC = 5e-2
@@ -239,17 +235,6 @@ def errorcheck(xo,x1,eps):
         y = 0
     return y
 # --------------------------- 8. Get Mac -------------------------------------#
-# def getMAC(x0,x1,eps):
-#     Num = np.abs(np.matmul(x0[:],(x1[:].reshape(-1,1))))**2
-#     D1 = np.matmul(x0[:],(x0[:].reshape(-1,1)))
-#     D2 = np.matmul(x1[:],(x1[:].reshape(-1,1)))
-#     dummpyMac = Num/(D1*D2)
-#     if dummpyMac >(1-eps):
-#         y = 1
-#     else:
-#         y = 0 
-#     return  y,dummpyMac
-
 def getMAC(x0, x1, eps):
     Num = np.abs(np.dot(x0.flatten(), x1.flatten()))**2
     D1 = np.dot(x0.flatten(), x0.flatten())
@@ -810,6 +795,10 @@ def plotStabDiag(fn, Acc, fs, stability_status, Nmin, Nmax, Nc, fo, fi):
     ax2.set_xlim(0,max_fn2*1.1)
     # ax2.set_yscale('log')
     ax1.legend(handles=handles, loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=5)
+    
+
+    # Adjust layout to make room for the legend
+    fig.tight_layout(rect=[0, 0.1, 1, 1])
     plt.show() 
 
 def cluster_data_by_frequency(fnS, zetaS, phiS, num_clusters):
