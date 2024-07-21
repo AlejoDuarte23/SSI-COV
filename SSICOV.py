@@ -1,10 +1,27 @@
 
 import numpy as np
 from collections import OrderedDict
-from numpy.typing import NDArray
+from numba import jit
 from typing import Tuple,Dict
+from utils import print_input_sizes, timeit
+from numpy.typing import NDArray
+from numba import jit, prange
 
-from utils import print_input_sizes
+@jit(nopython=True, parallel=True)
+def blockToeplitz_jit(IRF: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray]:   
+    N1 = round(IRF.shape[2] / 2) - 1
+    M = IRF.shape[1]
+    T1 = np.zeros(((N1) * M, (N1) * M), dtype='complex128')
+    
+    for oo in prange(N1):
+        for ll in prange(N1):
+            T1[(oo) * M:(oo + 1) * M, (ll) * M:(ll + 1) * M] = IRF[:, :, N1 - 1 + oo - ll + 1]
+    
+    U, S, Vt = np.linalg.svd(T1)
+    V = Vt.T
+
+    return U, S, V, T1
+
 
 class SSICOV:
     def __init__(self, acc: NDArray,
@@ -21,7 +38,7 @@ class SSICOV:
         self.Nc = Nc
         self.Nmax = Nmax
         self.Nmin = Nmin
-    
+    @timeit
     def NexT(self)->NDArray:
         dt = 1/self.fs
         M = round(self.Ts/dt)
@@ -39,21 +56,10 @@ class SSICOV:
             IRF = np.squeeze(IRF)
             IRF = IRF/IRF[0] 
         return IRF 
-    
-    @print_input_sizes
-    def blockToeplitz(self,IRF: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray]:   
-        N1 = round(IRF.shape[2]/2)-1
-        M = IRF.shape[1]
-        T1= np.zeros(((N1)*M,(N1)*M),dtype = 'complex128')
-        for oo in range(N1):
-            for ll in range(N1):
-                T1[(oo)*M:(oo+1)*M,(ll)*M:(ll+1)*M] = IRF[:,:,N1-1+oo-ll+1] 
-        [U,S,Vt] = np.linalg.svd(T1)
-        V = Vt.T
-
-        return U,S,V,T1
-    
-    @print_input_sizes
+    @timeit
+    def blockToeplitz(self, IRF: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray]:   
+        return blockToeplitz_jit(IRF)
+    @timeit
     def modalID(self,U,S,Nmodes,Nyy,fs):
         S = np.diag(S)
         if Nmodes >= S.shape[0]:
@@ -78,7 +84,7 @@ class SSICOV:
         phi = phi0[:,1::2]
         return fn,zeta,phi
     
-    @print_input_sizes
+    @timeit
     def stabilityCheck(self, fn0, zeta0, phi0, fn1, zeta1, phi1):
 
         eps_freq = 2e-2 
@@ -150,14 +156,15 @@ class SSICOV:
             y = 0
         return y, dummyMAC
     
-    @print_input_sizes
+    
     def flip_dic(self, a) -> OrderedDict:
         d = OrderedDict(a)
         dreversed = OrderedDict()
         for k in reversed(d):
             dreversed[k] = d[k]        
         return dreversed
-        
+    
+    @timeit
     def getStablePoles(self, fn, zeta, phi, MAC, stablity_status):
         fnS = []
         zetaS = []
@@ -192,6 +199,7 @@ class SSICOV:
         
         return fnS, zetaS, phiS, MACS
     
+    @timeit
     def run_stability(self,U,S):
         fn1_list = []
         i_list = []
@@ -252,10 +260,8 @@ class SSICOV:
                 zeta0=zeta1
                 phi0=phi1  
             kk = kk +1 
-        print(fn2)
 
         fn2 , zeta2, phi2 = self.flip_dic(fn2), self.flip_dic(zeta2), self.flip_dic(phi2)   
-        print(phi2)
         fnS,zetaS,phiS,MACS = self.getStablePoles(fn2,zeta2,phi2,MAC,stability_status)
 
         return fnS,zetaS,phiS,MACS,stability_status, fn2

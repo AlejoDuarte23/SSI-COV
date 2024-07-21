@@ -2,6 +2,7 @@
 import functools
 import inspect
 import numpy as np
+import time
 
 def print_input_sizes(func):
     @functools.wraps(func)
@@ -30,4 +31,14 @@ def print_input_sizes(func):
             print(f"Argument '{key}' (keyword): {get_size(value)}")
         
         return func(*args, **kwargs)
+    return wrapper
+
+def timeit(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        elapsed_time = time.time() - start_time
+        print(f"{func.__name__}, elapsed time: {elapsed_time:.6f} seconds")
+        return result
     return wrapper
