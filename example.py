@@ -1,19 +1,18 @@
-from scipy.io import loadmat
-from scipy.signal import welch
-from scipy import signal
-# import tabulate
-# Load .mat file
-import numpy as np
-import _ssi_cov_ad_vf as SSI
-import _ssi_backend as SSIb
 import matplotlib
 matplotlib.use('QT5Agg')
 import matplotlib.pyplot as plt
-
+import numpy as np 
+from scipy.io import loadmat
+from scipy.signal import welch
 from SSICOV import SSICOV
+from SSI_posprocessor import plotStabDiag , cluster_data_by_frequency
 
-mat = loadmat('BridgeData.mat')
-t, rz, wn = mat['t'], mat['rz'], mat['wn']
+
+
+def testing_data():
+    mat = loadmat('data/BridgeData.mat')
+    t, rz, wn = mat['t'], mat['rz'], mat['wn']
+    return t, rz, wn
 
 def plot_Data(t, rz, wn):
     # Transform circular frequency (rad/s) into frequency (Hz)
@@ -70,19 +69,21 @@ def plot_Data(t, rz, wn):
 
 
 if __name__ == '__main__':
+    t,rz,wn = testing_data()
     fs = 15 
-
     acc = rz.T
     Nmin = 7
     Nmax = 50
     Nc = acc.shape[1]
-
     Ts  = 100
-    ssi_constructor2 = SSICOV(acc, fs, Ts, Nc, Nmax, Nmin)
 
-    fnS,zetaS,phiS,MACS,stability_status,fn2 = ssi_constructor2.run()
+    ssi_constructor = SSICOV(acc, fs, Ts, Nc, Nmax, Nmin)
+    fnS,zetaS,phiS,MACS,stability_status,fn2 = ssi_constructor.run()
+    
     num_clusters = 6
-    summary = SSIb.cluster_data_by_frequency(fnS, zetaS, phiS, num_clusters)
-    SSIb.plotStabDiag(fn2, acc, fs, stability_status, Nmin, Nmax, acc.shape[1], 0, 7.5)
-    # Run the analysis
+    
+    cluster_data_by_frequency(fnS, zetaS, phiS, num_clusters)
+    plotStabDiag(fn2, acc, fs, stability_status, Nmin, Nmax, acc.shape[1], 0, 7.5)
+
+
                     

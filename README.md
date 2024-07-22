@@ -70,8 +70,12 @@ Runs the complete SSI process and returns the stable modal parameters.
 
 ```python
 fnS, zetaS, phiS, MACS, stability_status, fn2 = ssicov.run()
+plotStabDiag(fn2, acc, fs, stability_status, Nmin, Nmax, acc.shape[1], 0, 7.5)
+
 ```
 
+## OUTPUT
+![STAB diagram](data/SSI.svg)
 ## Utilities
 
 The class uses several utility functions for timing and size printing. Ensure to include these utility functions in your project.
