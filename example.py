@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np 
 from scipy.io import loadmat
 from scipy.signal import welch
-from SSICOV import SSICOV
+from SSICOV_GPU import SSICOV
 from SSI_posprocessor import plotStabDiag , cluster_data_by_frequency
 
 
