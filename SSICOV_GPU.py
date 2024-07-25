@@ -20,8 +20,8 @@ def blockToeplitz_jit(IRF: cp.ndarray) -> Tuple[cp.ndarray, cp.ndarray, cp.ndarr
     T1 = cp.zeros((N1 * M, N1 * M), dtype=cp.complex128)
 
     # Replace prange with range if using 'numba' is not part of the requirement.
-    for oo in range(N1):
-        for ll in range(N1):
+    for oo in prange(N1):
+        for ll in prange(N1):
             # NumPy and CuPy indexing is similar. This should remain unchanged.
             T1[oo * M:(oo + 1) * M, ll * M:(ll + 1) * M] = IRF_cp[:, :, N1 - 1 + oo - ll]
 
