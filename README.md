@@ -10,6 +10,8 @@ pip install -r requirements.txt
 ```
 
 ## Usage
+You can check this video to see it in action
+[![Watch the video](https://img.youtube.com/vi/v4p26xE53NI/maxresdefault.jpg)](https://www.youtube.com/watch?v=v4p26xE53NI)
 
 ### Initialization
 
