@@ -1,5 +1,7 @@
 from pathlib import Path
+
 from scipy.io import loadmat
+
 from fast_ssi import SSICOV
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
@@ -7,7 +9,7 @@ DATA_DIR = Path(__file__).resolve().parent / "data"
 
 def test_ssicov_runs():
     mat = loadmat(DATA_DIR / "BridgeData.mat")
-    t, rz, wn = mat["t"], mat["rz"], mat["wn"]
+    _t, rz, _wn = mat["t"], mat["rz"], mat["wn"]
 
     fs = 15
     acc = rz.T

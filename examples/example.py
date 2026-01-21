@@ -1,9 +1,10 @@
-import numpy as np
 from pathlib import Path
+
+import numpy as np
 from scipy.io import loadmat
 from scipy.signal import welch
-from fast_ssi import SSICOV, plotStabDiag, cluster_data_by_frequency
 
+from fast_ssi import SSICOV, cluster_data_by_frequency, plotStabDiag
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 
@@ -16,7 +17,7 @@ def testing_data():
 
 def plot_Data(t, rz, wn):
     # Transform circular frequency (rad/s) into frequency (Hz)
-    fnTarget = wn / (2 * np.pi)
+    _fn_target = wn / (2 * np.pi)
 
     # Get time step
     dt = np.median(np.diff(t))

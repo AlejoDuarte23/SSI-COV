@@ -1,14 +1,14 @@
-import numpy as np
-from collections import OrderedDict
-from numba import jit
-from typing import Tuple, Dict
-from .utils import print_input_sizes, timeit
-from numpy.typing import NDArray
-from numba import jit, prange
 import time
+from collections import OrderedDict
+
+import numpy as np
+from numba import prange
+from numpy.typing import NDArray
+
+from .utils import timeit
 
 
-def blockToeplitz_jit(IRF: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray]:
+def blockToeplitz_jit(IRF: NDArray) -> tuple[NDArray, NDArray, NDArray, NDArray]:
     N1 = round(IRF.shape[2] / 2) - 1
     M = IRF.shape[1]
     T1 = np.zeros(((N1) * M, (N1) * M), dtype="complex128")
@@ -58,7 +58,7 @@ class SSICOV:
         return IRF
 
     @timeit
-    def blockToeplitz(self, IRF: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray]:
+    def blockToeplitz(self, IRF: NDArray) -> tuple[NDArray, NDArray, NDArray, NDArray]:
         return blockToeplitz_jit(IRF)
 
     @timeit
@@ -69,15 +69,15 @@ class SSICOV:
             Nmodes = S.shape[0]
         dt = 1 / self.fs
         # observability matrix
-        O = np.matmul(U[:, 0:Nmodes], np.sqrt(S[0:Nmodes, 0:Nmodes]))
+        obs = np.matmul(U[:, 0:Nmodes], np.sqrt(S[0:Nmodes, 0:Nmodes]))
         # time state-space matrices
-        IndO = min(Nyy, len(O[:, 0]))
-        C = O[0:IndO, :]
-        jb = O.shape[0] / IndO
+        IndO = min(Nyy, len(obs[:, 0]))
+        C = obs[0:IndO, :]
+        jb = obs.shape[0] / IndO
         ao = int((IndO) * (jb - 1))
-        bo = int(len(O[:, 0]) - (IndO) * (jb - 1))
-        co = len(O[:, 0])
-        A = np.matmul(np.linalg.pinv(O[0:ao, :]), O[bo:co, :])
+        bo = int(len(obs[:, 0]) - (IndO) * (jb - 1))
+        co = len(obs[:, 0])
+        A = np.matmul(np.linalg.pinv(obs[0:ao, :]), obs[bo:co, :])
         # eigen vals descop. of state matrix
         [Vi, Di] = np.linalg.eig(A)
         mu = np.log(np.diag(np.diag(Vi))) / dt
@@ -140,21 +140,14 @@ class SSICOV:
         return fn, zeta, phi, MAC, stability_status
 
     def errorcheck(self, xo, x1, eps):
-        if abs(1 - xo / x1) < eps:
-            y = 1
-        else:
-            y = 0
-        return y
+        return 1 if abs(1 - xo / x1) < eps else 0
 
     def getMAC(self, x0, x1, eps):
         Num = np.abs(np.dot(x0.flatten(), x1.flatten())) ** 2
         D1 = np.dot(x0.flatten(), x0.flatten())
         D2 = np.dot(x1.flatten(), x1.flatten())
         dummyMAC = Num / (D1 * D2)
-        if dummyMAC > (1 - eps):
-            y = 1
-        else:
-            y = 0
+        y = 1 if dummyMAC > (1 - eps) else 0
         return y, dummyMAC
 
     def flip_dic(self, a) -> OrderedDict:

@@ -1,8 +1,7 @@
-import numpy as np
 import matplotlib.pyplot as plt
-from scipy import signal
+import numpy as np
 from numpy.typing import NDArray
-from typing import Tuple
+from scipy import signal
 from sklearn.cluster import KMeans
 from tabulate import tabulate
 
@@ -10,7 +9,7 @@ from tabulate import tabulate
 # CPSD function
 def CPSD(
     Acc: NDArray, fs: int, Nc: int, fo: float, fi: float
-) -> Tuple[NDArray, NDArray, int]:
+) -> tuple[NDArray, NDArray, int]:
     def nextpow2(Acc):
         N = Acc.shape[0]
         _ex = np.round(np.log2(N), 0)
@@ -68,7 +67,7 @@ def plotStabDiag(fn, Acc, fs, stability_status, Nmin, Nmax, Nc, fo, fi):
                 ind = np.where(stability_status[ii] == jj)
                 x.extend(fn[ii][ind])
                 y.extend([Npoles[ii]] * len(fn[ii][ind]))
-            except:
+            except Exception:
                 print("Error !")
         (h,) = ax1.plot(x, y, markers[jj], label=labels[jj])
         handles.append(h)

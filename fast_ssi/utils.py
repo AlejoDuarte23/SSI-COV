@@ -1,7 +1,8 @@
 import functools
 import inspect
-import numpy as np
 import time
+
+import numpy as np
 
 
 def print_input_sizes(func):
@@ -23,7 +24,7 @@ def print_input_sizes(func):
         print(f"Function '{func.__name__}' called with:")
 
         # Print positional arguments with their names
-        for i, (arg_name, arg) in enumerate(zip(arg_names, args)):
+        for _i, (arg_name, arg) in enumerate(zip(arg_names, args, strict=False)):
             print(f"Argument '{arg_name}' (positional): {get_size(arg)}")
 
         # Print keyword arguments

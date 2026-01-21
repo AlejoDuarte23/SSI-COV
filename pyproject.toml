@@ -16,6 +16,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "pre-commit",
     "pytest",
     "ruff",
 ]
