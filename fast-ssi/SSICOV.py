@@ -6,8 +6,8 @@ from typing import Tuple,Dict
 from utils import print_input_sizes, timeit
 from numpy.typing import NDArray
 from numba import jit, prange
+import time
 
-@jit(nopython=True, parallel=True)
 def blockToeplitz_jit(IRF: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray]:   
     N1 = round(IRF.shape[2] / 2) - 1
     M = IRF.shape[1]
@@ -17,7 +17,9 @@ def blockToeplitz_jit(IRF: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray]
         for ll in prange(N1):
             T1[(oo) * M:(oo + 1) * M, (ll) * M:(ll + 1) * M] = IRF[:, :, N1 - 1 + oo - ll + 1]
     
+    start = time.time()
     U, S, Vt = np.linalg.svd(T1)
+    print(f" Elapse time {time.time()-start}s")
     V = Vt.T
 
     return U, S, V, T1
@@ -56,6 +58,7 @@ class SSICOV:
             IRF = np.squeeze(IRF)
             IRF = IRF/IRF[0] 
         return IRF 
+    
     @timeit
     def blockToeplitz(self, IRF: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray]:   
         return blockToeplitz_jit(IRF)
@@ -66,7 +69,9 @@ class SSICOV:
             print("changing the number of modes to the maximum possible")
             Nmodes = S.shape[0]
         dt = 1/self.fs
+        #observability matrix
         O = np.matmul(U[:,0:Nmodes],np.sqrt(S[0:Nmodes,0:Nmodes]))
+        # time state-space matrices
         IndO = min(Nyy,len(O[:,0]))
         C = O[0:IndO,:]
         jb =O.shape[0]/IndO
@@ -74,6 +79,7 @@ class SSICOV:
         bo = int(len(O[:,0])-(IndO)*(jb-1))
         co = len(O[:,0])
         A =np.matmul( np.linalg.pinv(O[0:ao,:]),O[bo:co,:])
+        # eigen vals descop. of state matrix
         [Vi,Di] = np.linalg.eig(A)
         mu = np.log(np.diag(np.diag(Vi)))/dt
         fno = np.abs(mu)/(2*np.pi)

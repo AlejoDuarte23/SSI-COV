@@ -8,6 +8,7 @@ from numpy.typing import NDArray
 from numba import jit, prange
 import cupy as cp
 
+import time 
 import numpy as np 
 import cupyx.linalg
 
@@ -26,7 +27,9 @@ def blockToeplitz_jit(IRF: cp.ndarray) -> Tuple[cp.ndarray, cp.ndarray, cp.ndarr
             T1[oo * M:(oo + 1) * M, ll * M:(ll + 1) * M] = IRF_cp[:, :, N1 - 1 + oo - ll]
 
     # Singular Value Decomposition (SVD)
+    start = time.time()
     _U, _S, Vt = cp.linalg.svd(T1)
+    print(f"Elapse time {start-time.time()}")
     # Transpose Vt to get V
     V = Vt.T
     U = cp.asnumpy(_U)
