@@ -1,21 +1,25 @@
 import functools
 import inspect
 import time
+from collections.abc import Callable, Sized
+from typing import ParamSpec, TypeVar
 
 import numpy as np
 
+P = ParamSpec("P")
+R = TypeVar("R")
 
-def print_input_sizes(func):
+
+def print_input_sizes[P, R](func: Callable[P, R]) -> Callable[P, R]:
     @functools.wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         # Function to get size or shape of the argument
-        def get_size(arg):
+        def get_size(arg: object) -> str:
             if isinstance(arg, np.ndarray):
                 return f"shape: {arg.shape}"
-            try:
+            if isinstance(arg, Sized):
                 return f"length: {len(arg)}"
-            except TypeError:
-                return f"not applicable (type: {type(arg).__name__})"
+            return f"not applicable (type: {type(arg).__name__})"
 
         # Get the function's argument names
         arg_names = inspect.signature(func).parameters
@@ -36,9 +40,9 @@ def print_input_sizes(func):
     return wrapper
 
 
-def timeit(func):
+def timeit[P, R](func: Callable[P, R]) -> Callable[P, R]:
     @functools.wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         start_time = time.time()
         result = func(*args, **kwargs)
         elapsed_time = time.time() - start_time
