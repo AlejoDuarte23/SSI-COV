@@ -17,6 +17,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest",
+    "ruff",
 ]
 
 [build-system]
@@ -26,3 +27,18 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 package-dir = {"" = "."}
 packages = ["fast_ssi"]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+# Common if you don’t want line-length lint to be blocking (formatter may exceed it in edge cases):
+ignore = ["E501"]
+
+[tool.ruff.format]
+# These match Ruff’s default formatter behavior (Black-like).
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

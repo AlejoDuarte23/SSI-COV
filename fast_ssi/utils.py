@@ -1,8 +1,8 @@
-
 import functools
 import inspect
 import numpy as np
 import time
+
 
 def print_input_sizes(func):
     @functools.wraps(func)
@@ -15,23 +15,25 @@ def print_input_sizes(func):
                 return f"length: {len(arg)}"
             except TypeError:
                 return f"not applicable (type: {type(arg).__name__})"
-        
+
         # Get the function's argument names
         arg_names = inspect.signature(func).parameters
-        
+
         # Print the function name
         print(f"Function '{func.__name__}' called with:")
-        
+
         # Print positional arguments with their names
         for i, (arg_name, arg) in enumerate(zip(arg_names, args)):
             print(f"Argument '{arg_name}' (positional): {get_size(arg)}")
-        
+
         # Print keyword arguments
         for key, value in kwargs.items():
             print(f"Argument '{key}' (keyword): {get_size(value)}")
-        
+
         return func(*args, **kwargs)
+
     return wrapper
+
 
 def timeit(func):
     @functools.wraps(func)
@@ -41,4 +43,5 @@ def timeit(func):
         elapsed_time = time.time() - start_time
         print(f"{func.__name__}, elapsed time: {elapsed_time:.6f} seconds")
         return result
+
     return wrapper
