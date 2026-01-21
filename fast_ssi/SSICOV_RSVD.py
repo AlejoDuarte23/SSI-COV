@@ -139,14 +139,15 @@ class SSICOV:
         bo = int(len(obs[:, 0]) - (IndO) * (jb - 1))
         co = len(obs[:, 0])
         A = np.matmul(np.linalg.pinv(obs[0:ao, :]), obs[bo:co, :])
-        [Vi, Di] = np.linalg.eig(A)
-        mu = np.log(np.diag(np.diag(Vi))) / dt
+        eigvals, eigvecs = np.linalg.eig(A)
+        mu = np.log(eigvals) / dt
         fno = np.abs(mu) / (2 * np.pi)
-        fn = fno[np.ix_(*[range(0, i, 2) for i in fno.shape])]
         zetaoo = -np.real(mu) / np.abs(mu)
-        zeta = zetaoo[np.ix_(*[range(0, i, 2) for i in zetaoo.shape])]
-        phi0 = np.real(np.matmul(C[0:IndO, :], Di))
-        phi = phi0[:, 1::2]
+        idx = np.arange(0, len(mu), 2)
+        fn = fno[idx]
+        zeta = zetaoo[idx]
+        phi0 = np.real(C @ eigvecs)
+        phi = phi0[:, idx]
         return fn, zeta, phi
 
     @timeit
