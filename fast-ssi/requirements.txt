@@ -1,8 +1,0 @@
-numpy
-scipy
-tabulate
-scikit-learn
-tqdm
-matplotlib
-numba
-time

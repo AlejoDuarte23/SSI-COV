@@ -1,0 +1,15 @@
+[project]
+name = "fast-ssi"
+version = "0.1.0"
+authors = [{ name = "Alejandro Duarte", email = "alejandroduartevendries@gmail.com" }]
+license = { text = "MIT" }
+requires-python = ">=3.12"
+dependencies = [
+    "numpy",
+    "scipy",
+    "tabulate",
+    "scikit-learn",
+    "tqdm",
+    "matplotlib",
+    "numba",
+]
