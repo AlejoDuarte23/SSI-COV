@@ -58,8 +58,9 @@ class SSICOV:
                 IRF[oo, jj, :] = np.real(h0[0 : M - 1])
 
         if self.Nc == 1:
-            IRF = np.squeeze(IRF)
-            IRF = IRF / IRF[0]
+            raise ValueError(
+                "Nc==1 is not supported; Toeplitz construction expects 3D IRF."
+            )
         return IRF
 
     @timeit
@@ -86,14 +87,17 @@ class SSICOV:
         co = len(obs[:, 0])
         A = np.matmul(np.linalg.pinv(obs[0:ao, :]), obs[bo:co, :])
         # eigen vals descop. of state matrix
-        [Vi, Di] = np.linalg.eig(A)
-        mu = np.log(np.diag(np.diag(Vi))) / dt
-        fno = np.abs(mu) / (2 * np.pi)
-        fn = fno[np.ix_(*[range(0, i, 2) for i in fno.shape])]
-        zetaoo = -np.real(mu) / np.abs(mu)
-        zeta = zetaoo[np.ix_(*[range(0, i, 2) for i in zetaoo.shape])]
-        phi0 = np.real(np.matmul(C[0:IndO, :], Di))
-        phi = phi0[:, 1::2]
+        eigvals, eigvecs = np.linalg.eig(A)
+        lam = np.log(eigvals) / dt
+        fno = np.abs(lam) / (2 * np.pi)
+        zetaoo = -np.real(lam) / np.abs(lam)
+        keep = np.imag(lam) > 0
+        if not np.any(keep):
+            keep = np.ones_like(lam, dtype=bool)
+        fn = fno[keep]
+        zeta = zetaoo[keep]
+        phi0 = C @ eigvecs
+        phi = phi0[:, keep]
         return fn, zeta, phi
 
     @timeit
@@ -119,8 +123,8 @@ class SSICOV:
         N0 = len(fn0)
         N1 = len(fn1)
 
-        for rr in range(N0 - 1):
-            for jj in range(N1 - 1):
+        for rr in range(N0):
+            for jj in range(N1):
                 stab_fn = self.errorcheck(fn0[rr], fn1[jj], eps_freq)
                 stab_zeta = self.errorcheck(zeta0[rr], zeta1[jj], eps_zeta)
                 stab_phi, dummyMAC = self.getMAC(phi0[:, rr], phi1[:, jj], eps_MAC)
@@ -159,9 +163,9 @@ class SSICOV:
         return 1 if abs(1 - xo / x1) < eps else 0
 
     def getMAC(self, x0: Array, x1: Array, eps: float) -> tuple[int, float]:
-        Num = np.abs(np.dot(x0.flatten(), x1.flatten())) ** 2
-        D1 = np.dot(x0.flatten(), x0.flatten())
-        D2 = np.dot(x1.flatten(), x1.flatten())
+        Num = np.abs(np.vdot(x0.flatten(), x1.flatten())) ** 2
+        D1 = np.vdot(x0.flatten(), x0.flatten())
+        D2 = np.vdot(x1.flatten(), x1.flatten())
         dummyMAC = Num / (D1 * D2)
         y = 1 if dummyMAC > (1 - eps) else 0
         return y, dummyMAC
@@ -210,7 +214,10 @@ class SSICOV:
         # Normalize mode shape
         for oo in range(phiS.shape[1]):
             phiS[:, oo] = phiS[:, oo] / np.max(np.abs(phiS[:, oo]))
-            if np.diff(phiS[0:2, oo]) < 0:
+            ref = phiS[0, oo]
+            if ref != 0:
+                phiS[:, oo] *= np.exp(-1j * np.angle(ref))
+            if np.real(phiS[0, oo]) < 0:
                 phiS[:, oo] = -phiS[:, oo]
 
         return fnS, zetaS, phiS, MACS
@@ -251,7 +258,7 @@ class SSICOV:
                 fn0 = fn1
                 zeta0 = zeta1
                 phi0 = phi1
-        kk = kk + 1
+            kk = kk + 1
 
         fn2 = self.flip_dic(fn2)
         zeta2 = self.flip_dic(zeta2)
