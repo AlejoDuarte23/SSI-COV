@@ -262,7 +262,7 @@ class SSICOV:
                 fn0 = fn1
                 zeta0 = zeta1
                 phi0 = phi1
-        kk = kk + 1
+            kk = kk + 1
 
         return fn2, zeta2, phi2, MAC, stability_status
 

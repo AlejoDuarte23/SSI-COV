@@ -252,7 +252,7 @@ class SSICOV:
                 fn0 = fn1
                 zeta0 = zeta1
                 phi0 = phi1
-        kk = kk + 1
+            kk = kk + 1
 
         fn2 = self.flip_dic(fn2)
         zeta2 = self.flip_dic(zeta2)
