@@ -350,7 +350,11 @@ class SSICOV:
                 phi0 = phi1
             kk = kk + 1
 
-        fn2, zeta2, phi2 = self.flip_dic(fn2), self.flip_dic(zeta2), self.flip_dic(phi2)
+        fn2 = self.flip_dic(fn2)
+        zeta2 = self.flip_dic(zeta2)
+        phi2 = self.flip_dic(phi2)
+        MAC = self.flip_dic(MAC)
+        stability_status = self.flip_dic(stability_status)
         fnS, zetaS, phiS, MACS = self.getStablePoles(
             fn2, zeta2, phi2, MAC, stability_status
         )
