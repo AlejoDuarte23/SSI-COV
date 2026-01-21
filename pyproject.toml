@@ -13,3 +13,8 @@ dependencies = [
     "matplotlib",
     "numba",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest",
+]
