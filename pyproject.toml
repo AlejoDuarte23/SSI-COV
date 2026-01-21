@@ -1,5 +1,5 @@
 [project]
-name = "fast-ssi"
+name = "fast_ssi"
 version = "0.1.0"
 authors = [{ name = "Alejandro Duarte", email = "alejandroduartevendries@gmail.com" }]
 license = { text = "MIT" }
@@ -18,3 +18,11 @@ dependencies = [
 dev = [
     "pytest",
 ]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+packages = ["fast_ssi"]

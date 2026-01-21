@@ -1,42 +1,29 @@
 
-#import numpy as np
+import numpy as np
 from collections import OrderedDict
 from numba import jit
 from typing import Tuple,Dict
-from utils import print_input_sizes, timeit
+from .utils import print_input_sizes, timeit
 from numpy.typing import NDArray
 from numba import jit, prange
-import cupy as cp
+import time
 
-import time 
-import numpy as np 
-import cupyx.linalg
-
-
-def blockToeplitz_jit(IRF: cp.ndarray) -> Tuple[cp.ndarray, cp.ndarray, cp.ndarray, cp.ndarray]:
+def blockToeplitz_jit(IRF: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray]:   
     N1 = round(IRF.shape[2] / 2) - 1
     M = IRF.shape[1]
-    IRF_cp = cp.array(IRF)  # Convert NumPy array to CuPy array
-
-    T1 = cp.zeros((N1 * M, N1 * M), dtype=cp.complex128)
-
-    # Replace prange with range if using 'numba' is not part of the requirement.
+    T1 = np.zeros(((N1) * M, (N1) * M), dtype='complex128')
+    
     for oo in prange(N1):
         for ll in prange(N1):
-            # NumPy and CuPy indexing is similar. This should remain unchanged.
-            T1[oo * M:(oo + 1) * M, ll * M:(ll + 1) * M] = IRF_cp[:, :, N1 - 1 + oo - ll]
-
-    # Singular Value Decomposition (SVD)
+            T1[(oo) * M:(oo + 1) * M, (ll) * M:(ll + 1) * M] = IRF[:, :, N1 - 1 + oo - ll + 1]
+    
     start = time.time()
-    _U, _S, Vt = cp.linalg.svd(T1)
-    print(f"Elapse time {start-time.time()}")
-    # Transpose Vt to get V
+    U, S, Vt = np.linalg.svd(T1)
+    print(f" Elapse time {time.time()-start}s")
     V = Vt.T
-    U = cp.asnumpy(_U)
-    S = cp.asnumpy(_S)
-
 
     return U, S, V, T1
+
 
 class SSICOV:
     def __init__(self, acc: NDArray,
@@ -47,30 +34,31 @@ class SSICOV:
                  Nmin: int
                  ) -> None:
         
-        self.acc = cp.array(acc)
+        self.acc = acc
         self.fs = fs
         self.Ts = Ts
         self.Nc = Nc
         self.Nmax = Nmax
         self.Nmin = Nmin
     @timeit
-    def NexT(self)->cp.ndarray:
+    def NexT(self)->NDArray:
         dt = 1/self.fs
         M = round(self.Ts/dt)
-        IRF = cp.zeros((self.Nc, self.Nc, M-1), dtype=cp.complex64)  # Use cupy's complex64 dtype
+        IRF = np.zeros((self.Nc,self.Nc,M-1),dtype = complex) 
         for oo in range(self.Nc):
             for jj in range(self.Nc):
-                y1 = cp.fft.fft(self.acc[:, oo])
-                y2 = cp.fft.fft(self.acc[:, jj])
-                # cross-correlation: ifft of [cross-power spectrum]
-                h0 = cp.fft.ifft(y1 * y2.conj())
-                # impulse response function
-                IRF[oo, jj, :] = cp.real(h0[:M-1])  # Using cupy's real method
+                y1 = np.fft.fft(self.acc[:,oo])
+                y2 = np.fft.fft(self.acc[:,jj])
+                #cross-correlation: ifft[cross-power spectrum]
+                h0 = np.fft.ifft(y1*y2.conj())
+                #impulse response function
+                IRF[oo,jj,:] = np.real(h0[0:M-1])
 
-        if self.Nc == 1:
-            IRF = IRF.squeeze()  # Use cupy's squeeze method
-            IRF = IRF / IRF[0]  # Normalization with cupy's arithmetic
-        return IRF
+        if self.Nc ==1:
+            IRF = np.squeeze(IRF)
+            IRF = IRF/IRF[0] 
+        return IRF 
+    
     @timeit
     def blockToeplitz(self, IRF: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray]:   
         return blockToeplitz_jit(IRF)
@@ -81,7 +69,9 @@ class SSICOV:
             print("changing the number of modes to the maximum possible")
             Nmodes = S.shape[0]
         dt = 1/self.fs
+        #observability matrix
         O = np.matmul(U[:,0:Nmodes],np.sqrt(S[0:Nmodes,0:Nmodes]))
+        # time state-space matrices
         IndO = min(Nyy,len(O[:,0]))
         C = O[0:IndO,:]
         jb =O.shape[0]/IndO
@@ -89,6 +79,7 @@ class SSICOV:
         bo = int(len(O[:,0])-(IndO)*(jb-1))
         co = len(O[:,0])
         A =np.matmul( np.linalg.pinv(O[0:ao,:]),O[bo:co,:])
+        # eigen vals descop. of state matrix
         [Vi,Di] = np.linalg.eig(A)
         mu = np.log(np.diag(np.diag(Vi)))/dt
         fno = np.abs(mu)/(2*np.pi)
@@ -243,7 +234,13 @@ class SSICOV:
                 phi0=phi1  
         kk = kk +1 
 
-        return fn2 , zeta2, phi2, MAC, stability_status
+        fn2 = self.flip_dic(fn2)
+        zeta2 = self.flip_dic(zeta2)
+        phi2 = self.flip_dic(phi2)
+        MAC = self.flip_dic(MAC)
+        stability_status = self.flip_dic(stability_status)
+
+        return fn2, zeta2, phi2, MAC, stability_status
     
     def run(self):
         IRF = self.NexT()
@@ -276,10 +273,15 @@ class SSICOV:
                 phi0=phi1  
             kk = kk +1 
 
-        fn2 , zeta2, phi2 = self.flip_dic(fn2), self.flip_dic(zeta2), self.flip_dic(phi2)   
-        fnS,zetaS,phiS,MACS = self.getStablePoles(fn2,zeta2,phi2,MAC,stability_status)
+        fn2 = self.flip_dic(fn2)
+        zeta2 = self.flip_dic(zeta2)
+        phi2 = self.flip_dic(phi2)
+        MAC = self.flip_dic(MAC)
+        stability_status = self.flip_dic(stability_status)
 
-        return fnS,zetaS,phiS,MACS,stability_status, fn2
+        fnS, zetaS, phiS, MACS = self.getStablePoles(fn2, zeta2, phi2, MAC, stability_status)
+
+        return fnS, zetaS, phiS, MACS, stability_status, fn2
 
 
 

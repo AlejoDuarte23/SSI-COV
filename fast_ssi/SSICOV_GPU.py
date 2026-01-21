@@ -1,92 +1,42 @@
-import time 
-import numpy as np
+
+#import numpy as np
 from collections import OrderedDict
-from typing import Tuple
-from utils import  timeit
+from numba import jit
+from typing import Tuple,Dict
+from .utils import print_input_sizes, timeit
 from numpy.typing import NDArray
+from numba import jit, prange
+import cupy as cp
+
+import time 
+import numpy as np 
+import cupyx.linalg
 
 
-def build_block_toeplitz(IRF: NDArray) -> Tuple[NDArray,int]:
-    """
-    Builds the block Toeplitz matrix T1 from IRF.
-    IRF is assumed to have shape (X, M, 2*N1+2) or similar,
-    where N1 = round(IRF.shape[2]/2) - 1.
-    """
+def blockToeplitz_jit(IRF: cp.ndarray) -> Tuple[cp.ndarray, cp.ndarray, cp.ndarray, cp.ndarray]:
     N1 = round(IRF.shape[2] / 2) - 1
     M = IRF.shape[1]
-    T1 = np.zeros((N1 * M, N1 * M), dtype=np.complex128)
-    T  = N1 * M  # The Toeplitz dimension
-    k_percent = max(30 - 0.00156 * T, 25) 
-    rank_value = int((k_percent / 100.0) * T)
+    IRF_cp = cp.array(IRF)  # Convert NumPy array to CuPy array
 
-    for oo in range(N1):
-        for ll in range(N1):
-            T1[oo * M:(oo + 1) * M, ll * M:(ll + 1) * M] = IRF[:, :, N1 - 1 + oo - ll + 1]
+    T1 = cp.zeros((N1 * M, N1 * M), dtype=cp.complex128)
 
-    return T1,rank_value
+    # Replace prange with range if using 'numba' is not part of the requirement.
+    for oo in prange(N1):
+        for ll in prange(N1):
+            # NumPy and CuPy indexing is similar. This should remain unchanged.
+            T1[oo * M:(oo + 1) * M, ll * M:(ll + 1) * M] = IRF_cp[:, :, N1 - 1 + oo - ll]
 
-
-def randomized_svd(
-    T1: NDArray, 
-    rank: int, 
-    num_oversamples: int = 10, 
-    n_iter: int = 2
-) -> Tuple[NDArray, NDArray, NDArray]:
-    """
-    Computes a randomized SVD of T1.
-    - Random sampling creates low-dimensional sketch of input matrix
-    - Construction of orthonormal basis for sampled subspace
-    - Projection of original matrix onto constructed basis
-    - SVD computation on smaller projected matrix
-
-    """
-    rows, cols = T1.shape
-    # Random projection
-    random_matrix = np.random.randn(cols, rank + num_oversamples)
-    Y = T1 @ random_matrix
-
-    # This improve the approximation :)
-    for _ in range(n_iter):
-        Y = T1 @ (T1.conj().T @ Y)
-
-    # basis (Q) for Y
-    Q, _ = np.linalg.qr(Y, mode='reduced')
-
-    # restrict T1 to the subspace spanned by Q
-    B = Q.conj().T @ T1
-
-    #SVD on  B
+    # Singular Value Decomposition (SVD)
     start = time.time()
-    U_tilde, S, Vt = np.linalg.svd(B, full_matrices=False)
-    print(f" RSVD Elapse time {time.time()-start}s")
+    _U, _S, Vt = cp.linalg.svd(T1)
+    print(f"Elapse time {start-time.time()}")
+    # Transpose Vt to get V
+    V = Vt.T
+    U = cp.asnumpy(_U)
+    S = cp.asnumpy(_S)
 
-
-    # eeconstruct U and V
-    U = Q @ U_tilde
-    V = Vt.conj().T
-
-    # keep only the top 'rank' components
-    U = U[:, :rank]
-    S = S[:rank]
-    V = V[:, :rank]
-
-    return U, S, V
-
-
-def blockToeplitz_jit_randomSVD(
-    IRF: NDArray, 
-    rank: int,
-    num_oversamples: int = 10, 
-    n_iter: int = 2
-) -> Tuple[NDArray, NDArray, NDArray, NDArray]:
-
-    T1,rank = build_block_toeplitz(IRF)
-    print(f"Selected Rank:{rank}")
-
-    U, S, V = randomized_svd(T1, rank, num_oversamples, n_iter)
 
     return U, S, V, T1
-    
 
 class SSICOV:
     def __init__(self, acc: NDArray,
@@ -97,33 +47,33 @@ class SSICOV:
                  Nmin: int
                  ) -> None:
         
-        self.acc = acc
+        self.acc = cp.array(acc)
         self.fs = fs
         self.Ts = Ts
         self.Nc = Nc
         self.Nmax = Nmax
         self.Nmin = Nmin
     @timeit
-    def NexT(self)->NDArray:
+    def NexT(self)->cp.ndarray:
         dt = 1/self.fs
         M = round(self.Ts/dt)
-        IRF = np.zeros((self.Nc,self.Nc,M-1),dtype = complex) 
+        IRF = cp.zeros((self.Nc, self.Nc, M-1), dtype=cp.complex64)  # Use cupy's complex64 dtype
         for oo in range(self.Nc):
             for jj in range(self.Nc):
-                y1 = np.fft.fft(self.acc[:,oo])
-                y2 = np.fft.fft(self.acc[:,jj])
-                #cross-correlation: ifft[cross-power spectrum]
-                h0 = np.fft.ifft(y1*y2.conj())
-                #impulse response function
-                IRF[oo,jj,:] = np.real(h0[0:M-1])
+                y1 = cp.fft.fft(self.acc[:, oo])
+                y2 = cp.fft.fft(self.acc[:, jj])
+                # cross-correlation: ifft of [cross-power spectrum]
+                h0 = cp.fft.ifft(y1 * y2.conj())
+                # impulse response function
+                IRF[oo, jj, :] = cp.real(h0[:M-1])  # Using cupy's real method
 
-        if self.Nc ==1:
-            IRF = np.squeeze(IRF)
-            IRF = IRF/IRF[0] 
-        return IRF 
+        if self.Nc == 1:
+            IRF = IRF.squeeze()  # Use cupy's squeeze method
+            IRF = IRF / IRF[0]  # Normalization with cupy's arithmetic
+        return IRF
     @timeit
     def blockToeplitz(self, IRF: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray]:   
-        return blockToeplitz_jit_randomSVD(IRF,rank=50)
+        return blockToeplitz_jit(IRF)
     @timeit
     def modalID(self,U,S,Nmodes,Nyy,fs):
         S = np.diag(S)
