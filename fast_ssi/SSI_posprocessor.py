@@ -1,3 +1,6 @@
+from collections.abc import Mapping
+from typing import Any
+
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
@@ -5,12 +8,14 @@ from scipy import signal
 from sklearn.cluster import KMeans
 from tabulate import tabulate
 
+Array = NDArray[Any]
+
 
 # CPSD function
 def CPSD(
-    Acc: NDArray, fs: int, Nc: int, fo: float, fi: float
-) -> tuple[NDArray, NDArray, int]:
-    def nextpow2(Acc):
+    Acc: Array, fs: float, Nc: int, fo: float, fi: float
+) -> tuple[Array, Array, int]:
+    def nextpow2(Acc: Array) -> int:
         N = Acc.shape[0]
         _ex = np.round(np.log2(N), 0)
         Nfft = 2 ** (_ex + 1)
@@ -43,7 +48,17 @@ def CPSD(
     return freq_id, TSxx, N
 
 
-def plotStabDiag(fn, Acc, fs, stability_status, Nmin, Nmax, Nc, fo, fi):
+def plotStabDiag(
+    fn: Mapping[int, Array],
+    Acc: Array,
+    fs: float,
+    stability_status: Mapping[int, Array],
+    Nmin: int,
+    Nmax: int,
+    Nc: int,
+    fo: float,
+    fi: float,
+) -> None:
     freq_id, TSxx, N = CPSD(Acc, fs, Nc, fo, fi)
 
     Npoles = np.arange(Nmin, Nmax + 1)
@@ -60,8 +75,8 @@ def plotStabDiag(fn, Acc, fs, stability_status, Nmin, Nmax, Nc, fo, fi):
     ]
     handles = []
     for jj in range(5):
-        x = []
-        y = []
+        x: list[float] = []
+        y: list[float] = []
         for ii in range(len(fn)):
             try:
                 ind = np.where(stability_status[ii] == jj)
@@ -88,11 +103,13 @@ def plotStabDiag(fn, Acc, fs, stability_status, Nmin, Nmax, Nc, fo, fi):
     # ax2.set_yscale('log')
     ax1.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=5)
 
-    fig.tight_layout(rect=[0, 0.1, 1, 1])
+    fig.tight_layout(rect=(0, 0.1, 1, 1))
     plt.show()
 
 
-def cluster_data_by_frequency(fnS, zetaS, phiS, num_clusters):
+def cluster_data_by_frequency(
+    fnS: Array, zetaS: Array, phiS: Array, num_clusters: int
+) -> dict[int, dict[str, Any]]:
     kmeans = KMeans(n_clusters=num_clusters)
     kmeans.fit(fnS.reshape(-1, 1))
 

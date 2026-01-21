@@ -5,3 +5,10 @@ repos:
       - id: ruff-check
         args: [--fix]
       - id: ruff-format
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (uv)
+        entry: uv run --group dev mypy --strict --config-file pyproject.toml fast_ssi
+        language: system
+        pass_filenames: false

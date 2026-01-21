@@ -1,5 +1,7 @@
 import time
 from collections import OrderedDict
+from collections.abc import Mapping
+from typing import Any, TypeVar
 
 import cupy as cp
 import numpy as np
@@ -7,6 +9,9 @@ from numba import prange
 from numpy.typing import NDArray
 
 from .utils import timeit
+
+Array = NDArray[Any]
+T = TypeVar("T")
 
 
 def blockToeplitz_jit(
@@ -40,7 +45,7 @@ def blockToeplitz_jit(
 
 class SSICOV:
     def __init__(
-        self, acc: NDArray, fs: float, Ts: float, Nc: int, Nmax: int, Nmin: int
+        self, acc: Array, fs: float, Ts: float, Nc: int, Nmax: int, Nmin: int
     ) -> None:
         self.acc = cp.array(acc)
         self.fs = fs
@@ -71,11 +76,13 @@ class SSICOV:
         return IRF
 
     @timeit
-    def blockToeplitz(self, IRF: NDArray) -> tuple[NDArray, NDArray, NDArray, NDArray]:
+    def blockToeplitz(self, IRF: Array) -> tuple[Array, Array, Array, Array]:
         return blockToeplitz_jit(IRF)
 
     @timeit
-    def modalID(self, U, S, Nmodes, Nyy, fs):
+    def modalID(
+        self, U: Array, S: Array, Nmodes: int, Nyy: int, fs: float
+    ) -> tuple[Array, Array, Array]:
         S = np.diag(S)
         if Nmodes >= S.shape[0]:
             print("changing the number of modes to the maximum possible")
@@ -100,15 +107,23 @@ class SSICOV:
         return fn, zeta, phi
 
     @timeit
-    def stabilityCheck(self, fn0, zeta0, phi0, fn1, zeta1, phi1):
+    def stabilityCheck(
+        self,
+        fn0: Array,
+        zeta0: Array,
+        phi0: Array,
+        fn1: Array,
+        zeta1: Array,
+        phi1: Array,
+    ) -> tuple[Array, Array, Array, Array, Array]:
         eps_freq = 2e-2
         eps_zeta = 4e-2
         eps_MAC = 5e-2
-        stability_status = []
-        fn = []
-        zeta = []
-        phi_list = []
-        MAC = []
+        stability_list: list[int] = []
+        fn_list: list[float] = []
+        zeta_list: list[float] = []
+        phi_list: list[Array] = []
+        mac_list: list[float] = []
 
         # frequency stability
         N0 = len(fn0)
@@ -134,25 +149,26 @@ class SSICOV:
                 else:
                     raise ValueError("Error: stability_status is undefined")
 
-                fn.append(fn1[jj])
-                zeta.append(zeta1[jj])
+                fn_list.append(fn1[jj])
+                zeta_list.append(zeta1[jj])
                 phi_list.append(phi1[:, jj])
-                MAC.append(dummyMAC)
-                stability_status.append(stabStatus)
+                mac_list.append(dummyMAC)
+                stability_list.append(stabStatus)
 
-        ind = np.argsort(fn)
-        fn = np.sort(fn)
-        zeta = np.array(zeta)[ind]
-        phi = np.column_stack(phi_list)[:, ind]
-        MAC = np.array(MAC)[ind]
-        stability_status = np.array(stability_status)[ind]
+        fn_arr = np.array(fn_list)
+        ind = np.argsort(fn_arr)
+        fn_sorted = fn_arr[ind]
+        zeta_arr = np.array(zeta_list)[ind]
+        phi_arr = np.column_stack(phi_list)[:, ind]
+        mac_arr = np.array(mac_list)[ind]
+        stability_arr = np.array(stability_list)[ind]
 
-        return fn, zeta, phi, MAC, stability_status
+        return fn_sorted, zeta_arr, phi_arr, mac_arr, stability_arr
 
-    def errorcheck(self, xo, x1, eps):
+    def errorcheck(self, xo: float, x1: float, eps: float) -> int:
         return 1 if abs(1 - xo / x1) < eps else 0
 
-    def getMAC(self, x0, x1, eps):
+    def getMAC(self, x0: Array, x1: Array, eps: float) -> tuple[int, float]:
         Num = np.abs(np.dot(x0.flatten(), x1.flatten())) ** 2
         D1 = np.dot(x0.flatten(), x0.flatten())
         D2 = np.dot(x1.flatten(), x1.flatten())
@@ -160,7 +176,7 @@ class SSICOV:
         y = 1 if dummyMAC > (1 - eps) else 0
         return y, dummyMAC
 
-    def flip_dic(self, a) -> OrderedDict:
+    def flip_dic(self, a: Mapping[int, T]) -> OrderedDict[int, T]:
         d = OrderedDict(a)
         dreversed = OrderedDict()
         for k in reversed(d):
@@ -168,24 +184,31 @@ class SSICOV:
         return dreversed
 
     @timeit
-    def getStablePoles(self, fn, zeta, phi, MAC, stablity_status):
-        fnS = []
-        zetaS = []
-        phiS = []
-        MACS = []
+    def getStablePoles(
+        self,
+        fn: Mapping[int, Array],
+        zeta: Mapping[int, Array],
+        phi: Mapping[int, Array],
+        MAC: Mapping[int, Array],
+        stablity_status: Mapping[int, Array],
+    ) -> tuple[Array, Array, Array, Array]:
+        fnS_list: list[float] = []
+        zetaS_list: list[float] = []
+        phiS_list: list[Array] = []
+        macs_list: list[float] = []
 
         for i in range(len(fn)):
             for j in range(len(stablity_status[i])):
                 if stablity_status[i][j] == 1:
-                    fnS.append(fn[i][j])
-                    zetaS.append(zeta[i][j])
-                    phiS.append(phi[i][:, j])
-                    MACS.append(MAC[i][j])
+                    fnS_list.append(fn[i][j])
+                    zetaS_list.append(zeta[i][j])
+                    phiS_list.append(phi[i][:, j])
+                    macs_list.append(MAC[i][j])
 
-        fnS = np.array(fnS)
-        zetaS = np.array(zetaS)
-        phiS = np.array(phiS).T
-        MACS = np.array(MACS)
+        fnS = np.array(fnS_list)
+        zetaS = np.array(zetaS_list)
+        phiS = np.array(phiS_list).T
+        MACS = np.array(macs_list)
 
         # Remove negative damping
         valid_indices = zetaS > 0
@@ -203,9 +226,17 @@ class SSICOV:
         return fnS, zetaS, phiS, MACS
 
     @timeit
-    def run_stability(self, U, S):
-        fn1_list = []
-        i_list = []
+    def run_stability(
+        self, U: Array, S: Array
+    ) -> tuple[
+        Mapping[int, Array],
+        Mapping[int, Array],
+        Mapping[int, Array],
+        Mapping[int, Array],
+        Mapping[int, Array],
+    ]:
+        fn1_list: list[Array] = []
+        i_list: list[int] = []
         kk = 0
         fn2, zeta2, phi2, MAC, stability_status = {}, {}, {}, {}, {}
 
@@ -234,12 +265,21 @@ class SSICOV:
 
         return fn2, zeta2, phi2, MAC, stability_status
 
-    def run(self):
+    def run(
+        self,
+    ) -> tuple[
+        Array,
+        Array,
+        Array,
+        Array,
+        Mapping[int, Array],
+        Mapping[int, Array],
+    ]:
         IRF = self.NexT()
         [U, S, V, T] = self.blockToeplitz(IRF)
         # fn2, zeta2, phi2, MAC, stability_status = self.run_stability(U, S)
-        fn1_list = []
-        i_list = []
+        fn1_list: list[Array] = []
+        i_list: list[int] = []
         kk = 0
         fn2, zeta2, phi2, MAC, stability_status = {}, {}, {}, {}, {}
 
