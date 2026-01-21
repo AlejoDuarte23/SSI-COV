@@ -71,8 +71,9 @@ class SSICOV:
                 IRF[oo, jj, :] = cp.real(h0[: M - 1])  # Using cupy's real method
 
         if self.Nc == 1:
-            IRF = IRF.squeeze()  # Use cupy's squeeze method
-            IRF = IRF / IRF[0]  # Normalization with cupy's arithmetic
+            raise ValueError(
+                "Nc==1 is not supported; Toeplitz construction expects 3D IRF."
+            )
         return IRF
 
     @timeit

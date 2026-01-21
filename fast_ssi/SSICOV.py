@@ -58,8 +58,9 @@ class SSICOV:
                 IRF[oo, jj, :] = np.real(h0[0 : M - 1])
 
         if self.Nc == 1:
-            IRF = np.squeeze(IRF)
-            IRF = IRF / IRF[0]
+            raise ValueError(
+                "Nc==1 is not supported; Toeplitz construction expects 3D IRF."
+            )
         return IRF
 
     @timeit
