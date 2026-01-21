@@ -120,8 +120,8 @@ class SSICOV:
         N0 = len(fn0)
         N1 = len(fn1)
 
-        for rr in range(N0 - 1):
-            for jj in range(N1 - 1):
+        for rr in range(N0):
+            for jj in range(N1):
                 stab_fn = self.errorcheck(fn0[rr], fn1[jj], eps_freq)
                 stab_zeta = self.errorcheck(zeta0[rr], zeta1[jj], eps_zeta)
                 stab_phi, dummyMAC = self.getMAC(phi0[:, rr], phi1[:, jj], eps_MAC)
