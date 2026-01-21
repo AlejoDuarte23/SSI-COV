@@ -1,0 +1,28 @@
+[project]
+name = "fast_ssi"
+version = "0.1.0"
+authors = [{ name = "Alejandro Duarte", email = "alejandroduartevendries@gmail.com" }]
+license = { text = "MIT" }
+requires-python = ">=3.12"
+dependencies = [
+    "numpy",
+    "scipy",
+    "tabulate",
+    "scikit-learn",
+    "tqdm",
+    "matplotlib",
+    "numba",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+packages = ["fast_ssi"]

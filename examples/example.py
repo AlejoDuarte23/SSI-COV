@@ -1,16 +1,16 @@
-import matplotlib
-matplotlib.use('QT5Agg')
-import matplotlib.pyplot as plt
-import numpy as np 
+import numpy as np
+from pathlib import Path
 from scipy.io import loadmat
 from scipy.signal import welch
-from SSICOV_GPU import SSICOV
-from SSI_posprocessor import plotStabDiag , cluster_data_by_frequency
+from fast_ssi import SSICOV, plotStabDiag, cluster_data_by_frequency
 
+
+
+DATA_DIR = Path(__file__).resolve().parent / "data"
 
 
 def testing_data():
-    mat = loadmat('data/BridgeData.mat')
+    mat = loadmat(DATA_DIR / "BridgeData.mat")
     t, rz, wn = mat['t'], mat['rz'], mat['wn']
     return t, rz, wn
 
@@ -28,6 +28,7 @@ def plot_Data(t, rz, wn):
     Nyy, N = rz.shape
     
     # Visualization of the data
+    import matplotlib.pyplot as plt
     plt.figure()
     
     # Displacement record from sensor no 2
@@ -66,24 +67,23 @@ def plot_Data(t, rz, wn):
     # Show the plots
     plt.show()
 
-
-
-if __name__ == '__main__':
-    t,rz,wn = testing_data()
-    fs = 15 
+def main():
+    t, rz, wn = testing_data()
+    fs = 15
     acc = rz.T
     Nmin = 7
     Nmax = 50
     Nc = acc.shape[1]
-    Ts  = 100
+    Ts = 10
 
     ssi_constructor = SSICOV(acc, fs, Ts, Nc, Nmax, Nmin)
-    fnS,zetaS,phiS,MACS,stability_status,fn2 = ssi_constructor.run()
-    
+    fnS, zetaS, phiS, MACS, stability_status, fn2 = ssi_constructor.run()
+
     num_clusters = 6
-    
     cluster_data_by_frequency(fnS, zetaS, phiS, num_clusters)
     plotStabDiag(fn2, acc, fs, stability_status, Nmin, Nmax, acc.shape[1], 0, 7.5)
+    plot_Data(t, rz, wn)
 
 
-                    
+if __name__ == "__main__":
+    main()
