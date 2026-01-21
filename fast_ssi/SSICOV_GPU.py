@@ -98,14 +98,16 @@ class SSICOV:
         co = len(obs[:, 0])
         A = np.matmul(np.linalg.pinv(obs[0:ao, :]), obs[bo:co, :])
         eigvals, eigvecs = np.linalg.eig(A)
-        mu = np.log(eigvals) / dt
-        fno = np.abs(mu) / (2 * np.pi)
-        zetaoo = -np.real(mu) / np.abs(mu)
-        idx = np.arange(0, len(mu), 2)
-        fn = fno[idx]
-        zeta = zetaoo[idx]
-        phi0 = np.real(C @ eigvecs)
-        phi = phi0[:, idx]
+        lam = np.log(eigvals) / dt
+        fno = np.abs(lam) / (2 * np.pi)
+        zetaoo = -np.real(lam) / np.abs(lam)
+        keep = np.imag(lam) > 0
+        if not np.any(keep):
+            keep = np.ones_like(lam, dtype=bool)
+        fn = fno[keep]
+        zeta = zetaoo[keep]
+        phi0 = C @ eigvecs
+        phi = phi0[:, keep]
         return fn, zeta, phi
 
     @timeit
@@ -171,9 +173,9 @@ class SSICOV:
         return 1 if abs(1 - xo / x1) < eps else 0
 
     def getMAC(self, x0: Array, x1: Array, eps: float) -> tuple[int, float]:
-        Num = np.abs(np.dot(x0.flatten(), x1.flatten())) ** 2
-        D1 = np.dot(x0.flatten(), x0.flatten())
-        D2 = np.dot(x1.flatten(), x1.flatten())
+        Num = np.abs(np.vdot(x0.flatten(), x1.flatten())) ** 2
+        D1 = np.vdot(x0.flatten(), x0.flatten())
+        D2 = np.vdot(x1.flatten(), x1.flatten())
         dummyMAC = Num / (D1 * D2)
         y = 1 if dummyMAC > (1 - eps) else 0
         return y, dummyMAC
@@ -222,7 +224,10 @@ class SSICOV:
         # Normalize mode shape
         for oo in range(phiS.shape[1]):
             phiS[:, oo] = phiS[:, oo] / np.max(np.abs(phiS[:, oo]))
-            if np.diff(phiS[0:2, oo]) < 0:
+            ref = phiS[0, oo]
+            if ref != 0:
+                phiS[:, oo] *= np.exp(-1j * np.angle(ref))
+            if np.real(phiS[0, oo]) < 0:
                 phiS[:, oo] = -phiS[:, oo]
 
         return fnS, zetaS, phiS, MACS
