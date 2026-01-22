@@ -1,21 +1,39 @@
 from collections.abc import Mapping
-from typing import Any
+from typing import Annotated, Any
 
 import matplotlib.pyplot as plt
 import numpy as np
-from numpy.typing import NDArray
 from scipy import signal
 from sklearn.cluster import KMeans
 from tabulate import tabulate
 
-Array = NDArray[Any]
+from .types import (
+    Array,
+    ChannelCount,
+    DampingRatios,
+    Frequencies,
+    FrequencyHz,
+    ModeShapes,
+    NaturalFrequencies,
+    SamplesByChannels,
+    SamplingRateHz,
+    SpectralDensity,
+)
 
 
 # CPSD function
 def CPSD(
-    Acc: Array, fs: float, Nc: int, fo: float, fi: float
-) -> tuple[Array, Array, int]:
-    def nextpow2(Acc: Array) -> int:
+    Acc: SamplesByChannels,
+    fs: SamplingRateHz,
+    Nc: ChannelCount,
+    fo: FrequencyHz,
+    fi: FrequencyHz,
+) -> tuple[
+    Frequencies,
+    SpectralDensity,
+    Annotated[int, "Number of frequency bins in selected band"],
+]:
+    def nextpow2(Acc: SamplesByChannels) -> int:
         N = Acc.shape[0]
         _ex = np.round(np.log2(N), 0)
         Nfft = 2 ** (_ex + 1)
@@ -49,15 +67,21 @@ def CPSD(
 
 
 def plotStabDiag(
-    fn: Mapping[int, Array],
-    Acc: Array,
-    fs: float,
-    stability_status: Mapping[int, Array],
-    Nmin: int,
-    Nmax: int,
-    Nc: int,
-    fo: float,
-    fi: float,
+    fn: Annotated[
+        Mapping[int, Array],
+        "Mapping: model order -> frequencies array, shape (n_i,)",
+    ],
+    Acc: SamplesByChannels,
+    fs: SamplingRateHz,
+    stability_status: Annotated[
+        Mapping[int, Array],
+        "Mapping: model order -> stability codes, shape (n_i,)",
+    ],
+    Nmin: Annotated[int, "Minimum model order"],
+    Nmax: Annotated[int, "Maximum model order"],
+    Nc: ChannelCount,
+    fo: FrequencyHz,
+    fi: FrequencyHz,
 ) -> None:
     freq_id, TSxx, N = CPSD(Acc, fs, Nc, fo, fi)
 
@@ -108,8 +132,11 @@ def plotStabDiag(
 
 
 def cluster_data_by_frequency(
-    fnS: Array, zetaS: Array, phiS: Array, num_clusters: int
-) -> dict[int, dict[str, Any]]:
+    fnS: NaturalFrequencies,
+    zetaS: DampingRatios,
+    phiS: ModeShapes,
+    num_clusters: Annotated[int, "Number of clusters to form"],
+) -> Annotated[dict[int, dict[str, Any]], "Cluster summary keyed by cluster id"]:
     kmeans = KMeans(n_clusters=num_clusters)
     kmeans.fit(fnS.reshape(-1, 1))
 
