@@ -1,7 +1,7 @@
 import time
 from collections import OrderedDict
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Annotated, Any, TypeVar
 
 import numpy as np
 from numba import prange
@@ -9,11 +9,42 @@ from numpy.typing import NDArray
 
 from .utils import timeit
 
-Array = NDArray[Any]
+type Array = NDArray[Any]
 T = TypeVar("T")
 
+type SamplesByChannels = Annotated[
+    Array, "Acceleration time series, shape (n_samples, n_channels)"
+]
+type SamplingRateHz = Annotated[float, "Sampling frequency in Hz"]
+type TimeLagSeconds = Annotated[
+    float, "Time-lag window in seconds (Ts); M = round(Ts * fs)"
+]
+type ChannelCount = Annotated[int, "Number of channels/sensors (Nc)"]
+type ModelOrder = Annotated[int, "Model order (state dimension)"]
+type IRFArray = Annotated[Array, "Impulse response function, shape (Nc, Nc, n_lags)"]
+type ToeplitzMatrix = Annotated[
+    Array,
+    "Block Toeplitz matrix, shape (n_blocks * Nc, n_blocks * Nc) with n_blocks = round(n_lags/2) - 1",
+]
+type LeftSingularVectors = Annotated[
+    Array, "Left singular vectors, shape (n_rows, n_singular_vectors)"
+]
+type RightSingularVectors = Annotated[
+    Array, "Right singular vectors, shape (n_cols, n_singular_vectors)"
+]
+type SingularValues = Annotated[Array, "Singular values, shape (n_singular_values,)"]
+type NaturalFrequencies = Annotated[Array, "Natural frequencies (Hz), shape (n_modes,)"]
+type DampingRatios = Annotated[Array, "Damping ratios, shape (n_modes,)"]
+type ModeShapes = Annotated[Array, "Mode shapes, shape (n_channels, n_modes)"]
+type MACValues = Annotated[Array, "MAC values, shape (n_pairs,)"]
+type StabilityCodes = Annotated[
+    Array, "Stability codes per pole pair, shape (n_pairs,)"
+]
 
-def blockToeplitz_jit(IRF: Array) -> tuple[Array, Array, Array, Array]:
+
+def blockToeplitz_jit(
+    IRF: IRFArray,
+) -> tuple[LeftSingularVectors, SingularValues, RightSingularVectors, ToeplitzMatrix]:
     N1 = round(IRF.shape[2] / 2) - 1
     M = IRF.shape[1]
     T1 = np.zeros(((N1) * M, (N1) * M), dtype="complex128")
@@ -34,7 +65,13 @@ def blockToeplitz_jit(IRF: Array) -> tuple[Array, Array, Array, Array]:
 
 class SSICOV:
     def __init__(
-        self, acc: Array, fs: float, Ts: float, Nc: int, Nmax: int, Nmin: int
+        self,
+        acc: SamplesByChannels,
+        fs: SamplingRateHz,
+        Ts: TimeLagSeconds,
+        Nc: ChannelCount,
+        Nmax: ModelOrder,
+        Nmin: ModelOrder,
     ) -> None:
         self.acc = acc
         self.fs = fs
@@ -44,7 +81,7 @@ class SSICOV:
         self.Nmin = Nmin
 
     @timeit
-    def NexT(self) -> Array:
+    def NexT(self) -> IRFArray:
         dt = 1 / self.fs
         M = round(self.Ts / dt)
         IRF = np.zeros((self.Nc, self.Nc, M - 1), dtype=complex)
@@ -64,13 +101,22 @@ class SSICOV:
         return IRF
 
     @timeit
-    def blockToeplitz(self, IRF: Array) -> tuple[Array, Array, Array, Array]:
+    def blockToeplitz(
+        self, IRF: IRFArray
+    ) -> tuple[
+        LeftSingularVectors, SingularValues, RightSingularVectors, ToeplitzMatrix
+    ]:
         return blockToeplitz_jit(IRF)
 
     @timeit
     def modalID(
-        self, U: Array, S: Array, Nmodes: int, Nyy: int, fs: float
-    ) -> tuple[Array, Array, Array]:
+        self,
+        U: LeftSingularVectors,
+        S: SingularValues,
+        Nmodes: ModelOrder,
+        Nyy: ChannelCount,
+        fs: SamplingRateHz,
+    ) -> tuple[NaturalFrequencies, DampingRatios, ModeShapes]:
         S = np.diag(S)
         if Nmodes >= S.shape[0]:
             print("changing the number of modes to the maximum possible")
@@ -103,13 +149,19 @@ class SSICOV:
     @timeit
     def stabilityCheck(
         self,
-        fn0: Array,
-        zeta0: Array,
-        phi0: Array,
-        fn1: Array,
-        zeta1: Array,
-        phi1: Array,
-    ) -> tuple[Array, Array, Array, Array, Array]:
+        fn0: NaturalFrequencies,
+        zeta0: DampingRatios,
+        phi0: ModeShapes,
+        fn1: NaturalFrequencies,
+        zeta1: DampingRatios,
+        phi1: ModeShapes,
+    ) -> tuple[
+        NaturalFrequencies,
+        DampingRatios,
+        ModeShapes,
+        MACValues,
+        StabilityCodes,
+    ]:
         eps_freq = 2e-2
         eps_zeta = 4e-2
         eps_MAC = 5e-2
@@ -159,10 +211,23 @@ class SSICOV:
 
         return fn_sorted, zeta_arr, phi_arr, mac_arr, stability_arr
 
-    def errorcheck(self, xo: float, x1: float, eps: float) -> int:
+    def errorcheck(
+        self,
+        xo: Annotated[float, "Reference value (scalar)"],
+        x1: Annotated[float, "Compared value (scalar)"],
+        eps: Annotated[float, "Relative tolerance threshold"],
+    ) -> int:
         return 1 if abs(1 - xo / x1) < eps else 0
 
-    def getMAC(self, x0: Array, x1: Array, eps: float) -> tuple[int, float]:
+    def getMAC(
+        self,
+        x0: Annotated[Array, "Mode shape vector, shape (n_channels,)"],
+        x1: Annotated[Array, "Mode shape vector, shape (n_channels,)"],
+        eps: Annotated[float, "MAC tolerance threshold"],
+    ) -> tuple[
+        Annotated[int, "1 if MAC > (1 - eps), else 0"],
+        Annotated[float, "Modal Assurance Criterion value"],
+    ]:
         Num = np.abs(np.vdot(x0.flatten(), x1.flatten())) ** 2
         D1 = np.vdot(x0.flatten(), x0.flatten())
         D2 = np.vdot(x1.flatten(), x1.flatten())
@@ -170,7 +235,10 @@ class SSICOV:
         y = 1 if dummyMAC > (1 - eps) else 0
         return y, dummyMAC
 
-    def flip_dic(self, a: Mapping[int, T]) -> OrderedDict[int, T]:
+    def flip_dic(
+        self,
+        a: Annotated[Mapping[int, T], "Mapping to reverse while preserving order"],
+    ) -> OrderedDict[int, T]:
         d = OrderedDict(a)
         dreversed = OrderedDict()
         for k in reversed(d):
@@ -180,12 +248,27 @@ class SSICOV:
     @timeit
     def getStablePoles(
         self,
-        fn: Mapping[int, Array],
-        zeta: Mapping[int, Array],
-        phi: Mapping[int, Array],
-        MAC: Mapping[int, Array],
-        stablity_status: Mapping[int, Array],
-    ) -> tuple[Array, Array, Array, Array]:
+        fn: Annotated[
+            Mapping[int, Array],
+            "Mapping: model order -> frequencies array, shape (n_i,)",
+        ],
+        zeta: Annotated[
+            Mapping[int, Array],
+            "Mapping: model order -> damping ratios array, shape (n_i,)",
+        ],
+        phi: Annotated[
+            Mapping[int, Array],
+            "Mapping: model order -> mode shapes, shape (n_channels, n_i)",
+        ],
+        MAC: Annotated[
+            Mapping[int, Array],
+            "Mapping: model order -> MAC values, shape (n_i,)",
+        ],
+        stablity_status: Annotated[
+            Mapping[int, Array],
+            "Mapping: model order -> stability codes, shape (n_i,)",
+        ],
+    ) -> tuple[NaturalFrequencies, DampingRatios, ModeShapes, MACValues]:
         fnS_list: list[float] = []
         zetaS_list: list[float] = []
         phiS_list: list[Array] = []
@@ -224,13 +307,28 @@ class SSICOV:
 
     @timeit
     def run_stability(
-        self, U: Array, S: Array
+        self, U: LeftSingularVectors, S: SingularValues
     ) -> tuple[
-        OrderedDict[int, Array],
-        OrderedDict[int, Array],
-        OrderedDict[int, Array],
-        OrderedDict[int, Array],
-        OrderedDict[int, Array],
+        Annotated[
+            OrderedDict[int, Array],
+            "Frequencies by model order, each shape (n_i,)",
+        ],
+        Annotated[
+            OrderedDict[int, Array],
+            "Damping ratios by model order, each shape (n_i,)",
+        ],
+        Annotated[
+            OrderedDict[int, Array],
+            "Mode shapes by model order, each shape (n_channels, n_i)",
+        ],
+        Annotated[
+            OrderedDict[int, Array],
+            "MAC values by model order, each shape (n_i,)",
+        ],
+        Annotated[
+            OrderedDict[int, Array],
+            "Stability codes by model order, each shape (n_i,)",
+        ],
     ]:
         fn1_list: list[Array] = []
         i_list: list[int] = []
@@ -271,12 +369,18 @@ class SSICOV:
     def run(
         self,
     ) -> tuple[
-        Array,
-        Array,
-        Array,
-        Array,
-        OrderedDict[int, Array],
-        OrderedDict[int, Array],
+        NaturalFrequencies,
+        DampingRatios,
+        ModeShapes,
+        MACValues,
+        Annotated[
+            OrderedDict[int, Array],
+            "Stability codes by model order, each shape (n_i,)",
+        ],
+        Annotated[
+            OrderedDict[int, Array],
+            "Frequencies by model order, each shape (n_i,)",
+        ],
     ]:
         IRF = self.NexT()
         [U, S, V, T] = self.blockToeplitz(IRF)
