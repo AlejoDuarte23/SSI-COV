@@ -3,23 +3,22 @@ from typing import Annotated, Any
 
 import matplotlib.pyplot as plt
 import numpy as np
-from numpy.typing import NDArray
 from scipy import signal
 from sklearn.cluster import KMeans
 from tabulate import tabulate
 
-type Array = NDArray[Any]
-type SamplesByChannels = Annotated[
-    Array, "Acceleration time series, shape (n_samples, n_channels)"
-]
-type SamplingRateHz = Annotated[float, "Sampling frequency in Hz"]
-type ChannelCount = Annotated[int, "Number of channels/sensors (Nc)"]
-type FrequencyHz = Annotated[float, "Frequency in Hz"]
-type Frequencies = Annotated[Array, "Frequency vector, shape (n_freq,)"]
-type SpectralDensity = Annotated[Array, "Spectral density vector, shape (n_freq,)"]
-type NaturalFrequencies = Annotated[Array, "Natural frequencies (Hz), shape (n_modes,)"]
-type DampingRatios = Annotated[Array, "Damping ratios, shape (n_modes,)"]
-type ModeShapes = Annotated[Array, "Mode shapes, shape (n_channels, n_modes)"]
+from .types import (
+    Array,
+    ChannelCount,
+    DampingRatios,
+    Frequencies,
+    FrequencyHz,
+    ModeShapes,
+    NaturalFrequencies,
+    SamplesByChannels,
+    SamplingRateHz,
+    SpectralDensity,
+)
 
 
 # CPSD function
