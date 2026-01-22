@@ -1,47 +1,35 @@
 import time
 from collections import OrderedDict
 from collections.abc import Mapping
-from typing import Annotated, Any, TypeVar
+from typing import Annotated, TypeVar
 
 import numpy as np
-from numpy.typing import NDArray
 
+from .types import (
+    Array,
+    ChannelCount,
+    DampingRatios,
+    IRFArray,
+    LeftSingularVectors,
+    MACValues,
+    ModelOrder,
+    ModeShapes,
+    NaturalFrequencies,
+    RightSingularVectors,
+    SamplesByChannels,
+    SamplingRateHz,
+    SingularValues,
+    StabilityCodes,
+    TimeLagSeconds,
+    ToeplitzMatrix,
+)
 from .utils import timeit
 
-type Array = NDArray[Any]
 T = TypeVar("T")
 
-type SamplesByChannels = Annotated[
-    Array, "Acceleration time series, shape (n_samples, n_channels)"
-]
-type SamplingRateHz = Annotated[float, "Sampling frequency in Hz"]
-type TimeLagSeconds = Annotated[
-    float, "Time-lag window in seconds (Ts); M = round(Ts * fs)"
-]
-type ChannelCount = Annotated[int, "Number of channels/sensors (Nc)"]
-type ModelOrder = Annotated[int, "Model order (state dimension)"]
 type Rank = Annotated[int, "Target rank for truncated/randomized SVD"]
 type Oversamples = Annotated[int, "Oversampling parameter for RSVD"]
 type PowerIterations = Annotated[int, "Power iteration count for RSVD"]
-type IRFArray = Annotated[Array, "Impulse response function, shape (Nc, Nc, n_lags)"]
-type ToeplitzMatrix = Annotated[
-    Array,
-    "Block Toeplitz matrix, shape (n_blocks * Nc, n_blocks * Nc) with n_blocks = round(n_lags/2) - 1",
-]
-type LeftSingularVectors = Annotated[
-    Array, "Left singular vectors, shape (n_rows, n_singular_vectors)"
-]
-type RightSingularVectors = Annotated[
-    Array, "Right singular vectors, shape (n_cols, n_singular_vectors)"
-]
-type SingularValues = Annotated[Array, "Singular values, shape (n_singular_values,)"]
-type NaturalFrequencies = Annotated[Array, "Natural frequencies (Hz), shape (n_modes,)"]
-type DampingRatios = Annotated[Array, "Damping ratios, shape (n_modes,)"]
-type ModeShapes = Annotated[Array, "Mode shapes, shape (n_channels, n_modes)"]
-type MACValues = Annotated[Array, "MAC values, shape (n_pairs,)"]
-type StabilityCodes = Annotated[
-    Array, "Stability codes per pole pair, shape (n_pairs,)"
-]
 
 
 def build_block_toeplitz(IRF: IRFArray) -> tuple[ToeplitzMatrix, Rank]:
