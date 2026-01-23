@@ -82,8 +82,11 @@ def plotStabDiag(
     Nc: ChannelCount,
     fo: FrequencyHz,
     fi: FrequencyHz,
+    stable_only: Annotated[bool, "Plot only stable poles (skip 'new pole')"] = False,
 ) -> None:
     freq_id, TSxx, N = CPSD(Acc, fs, Nc, fo, fi)
+    nyquist = fs / 2
+    f_max_data = min(fi, nyquist)
 
     Npoles = np.arange(Nmin, Nmax + 1)
     fig, ax1 = plt.subplots()
@@ -98,14 +101,19 @@ def plotStabDiag(
         "stable freq.",
     ]
     handles = []
-    for jj in range(5):
+    plot_classes = [1] if stable_only else range(5)
+    for jj in plot_classes:
         x: list[float] = []
         y: list[float] = []
         for ii in range(len(fn)):
             try:
                 ind = np.where(stability_status[ii] == jj)
-                x.extend(fn[ii][ind])
-                y.extend([Npoles[ii]] * len(fn[ii][ind]))
+                fvals = fn[ii][ind]
+                # Low-rank RSVD can yield spurious, heavily damped poles with |λ| > Nyquist,
+                # so we omit those from the stabilization diagram and enforce the fi window.
+                fvals = fvals[(fvals >= fo) & (fvals <= f_max_data)]
+                x.extend(fvals)
+                y.extend([Npoles[ii]] * len(fvals))
             except Exception:
                 print("Error !")
         (h,) = ax1.plot(x, y, markers[jj], label=labels[jj])
@@ -115,15 +123,14 @@ def plotStabDiag(
     ax1.set_ylim(0, Nmax + 2)
     ax2 = ax1.twinx()
 
-    max_fn2 = np.max([np.max(v) for v in fn.values()])
-
     # Plot CPSD
     color = "blue"
     ax2.set_xlabel("frequency [Hz]")
     ax2.set_ylabel("Power Spectral Density", color=color)
     ax2.plot(freq_id, 10 * np.log10(TSxx / N), color, label="Trace")
     ax2.tick_params(axis="y", labelcolor=color)
-    ax2.set_xlim(0, max_fn2 * 1.1)
+    ax1.set_xlim(fo, fi)
+    ax2.set_xlim(fo, fi)
     # ax2.set_yscale('log')
     ax1.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=5)
 
